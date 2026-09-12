@@ -12,10 +12,18 @@ For in-depth specifications, forensic guides, and API contracts, explore the doc
 
 | Document | Link | Summary |
 | :--- | :--- | :--- |
-| 🏛️ **System Architecture** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 6-layer architecture, mathematical formulations, Isolation Forest feature vectors, risk fusion ensemble, ledger specifications. |
-| 🔌 **REST API Reference** | [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Complete OpenAPI/REST documentation across all 8 modules with request/response schemas, Bearer JWT auth, and curl examples. |
-| 🚨 **Fraud Scenarios Guide** | [`docs/FRAUD_SCENARIOS_GUIDE.md`](docs/FRAUD_SCENARIOS_GUIDE.md) | Forensic analysis and investigation walkthrough for the 5 seeded fraud scenarios (`CLM-2026-LEGIT-01`, `CLM-2026-FRAUD-MTR`, etc.). |
-| 🎨 **Frontend & UX Guide** | [`docs/FRONTEND_GUIDE.md`](docs/FRONTEND_GUIDE.md) | Institutional GovTech design system, color palette rationale, dual frontend implementations, Lineage Explorer, and Vis.js network surveillance. |
+| ⚡ **Fabric Architecture** | [`docs/architecture.md`](docs/architecture.md) | Hyperledger Fabric v2.5 DLT architecture, 4-org topology, on-chain vs off-chain separation, rationale. |
+| 🌐 **Fabric Network Spec** | [`docs/fabric-network.md`](docs/fabric-network.md) | Detailed node topology, Raft consensus, MSP identity mapping, and deployment scripts. |
+| 📜 **Fabric Chaincode** | [`docs/chaincode.md`](docs/chaincode.md) | `RECContract` TypeScript implementation, MSP authorization checks, and lifecycle states. |
+| 📊 **REC Data Model** | [`docs/data-model.md`](docs/data-model.md) | On-chain asset schema, conservation laws, and off-chain PostgreSQL models. |
+| 🔐 **Security & Access Control** | [`docs/security.md`](docs/security.md) | MSP-level enforcement, off-chain SHA-256 document hashing, and threat modeling. |
+| 🔌 **Fabric REST API** | [`docs/api.md`](docs/api.md) | Endpoints for REC issuance, transfer, retirement, cancellation, verification, and audit history. |
+| 🚨 **Fraud Detection Engine** | [`docs/fraud-detection.md`](docs/fraud-detection.md) | Off-chain multi-engine forensic analysis, double-counting detection, and risk scoring. |
+| 🎬 **Official Demo Guide** | [`docs/demo.md`](docs/demo.md) | Interactive walkthrough for the 9-step demonstration scenario and prototype limitations. |
+| 🏛️ **System Architecture** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core 6-layer architecture, mathematical formulations, and risk fusion ensemble. |
+| 🔌 **Core REST API Reference**| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Platform OpenAPI/REST documentation across auth, facilities, claims, and telemetry. |
+| 🚨 **Fraud Scenarios Guide** | [`docs/FRAUD_SCENARIOS_GUIDE.md`](docs/FRAUD_SCENARIOS_GUIDE.md) | Forensic analysis and investigation walkthrough for the 5 seeded fraud scenarios. |
+| 🎨 **Frontend & UX Guide** | [`docs/FRONTEND_GUIDE.md`](docs/FRONTEND_GUIDE.md) | GovTech design system, Lineage Explorer, and Vis.js network surveillance. |
 
 ---
 
@@ -212,12 +220,83 @@ The response compiles an institutional 6-stage provenance graph and chronologica
 
 ---
 
-## 7. Automated Test Suite
+## 7. Hyperledger Fabric Permissioned Ledger (Enterprise DLT)
 
-The test suite runs 19 automated tests covering all engines, API routes, RBAC isolation, and ledger verification:
+The platform includes a **real, local Hyperledger Fabric v2.5 permissioned Distributed Ledger Technology (DLT)** network replacing simulated blockchain behavior.
 
+### 7.1 Architecture & The 4 Organizations
+* **RegulatorOrg (`RegulatorOrgMSP`)**: Regulatory surveillance, certificate suspension, and administrative cancellation (`cancelREC`).
+* **IssuerOrg (`IssuerOrgMSP`)**: Power facility validation and certificate issuance (`createREC`). Only authorized Issuer identities can issue certificates.
+* **BuyerOrg (`BuyerOrgMSP`)**: Corporate buyers holding, transferring (`transferREC`), and permanently retiring (`retireREC`) certificates for Scope 2 compliance.
+* **AuditorOrg (`AuditorOrgMSP`)**: Independent audit access, verifying transaction block history (`getRECHistory`) and document byte hashes.
+* **Channel**: Dedicated `rec-channel` with Raft consensus ordering (`orderer.rec.com:7050`).
+* **Smart Contract**: `RECContract` (TypeScript Chaincode as a Service - CCAAS v1.0).
+
+### 7.2 Quick Start Instructions (Clean Machine)
+
+#### Step 1: Start Hyperledger Fabric Network
 ```bash
-./venv/bin/pytest backend/tests -v
+# In Bash (Linux / macOS / Git Bash):
+cd fabric-network
+./network.sh startAll
+
+# In Windows PowerShell:
+cd fabric-network
+.\network.ps1 startAll
+```
+This automatically:
+1. Generates crypto material (Orderer & 4 Peer Orgs) via `cryptogen`.
+2. Launches Docker containers (`orderer.rec.com`, `peer0.regulator`, `peer0.issuer`, `peer0.buyer`, `peer0.auditor`, `cli`).
+3. Creates channel `rec-channel` and joins all 4 organizations.
+4. Packages, installs, approves, and commits `RECContract` chaincode.
+5. Launches the chaincode container `rec-contract:1.0` on port 9999.
+6. Builds and starts the Fabric Gateway bridge service on port 5050.
+
+#### Step 2: Start FastAPI Backend
+```bash
+cd backend
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+uvicorn app.main:app --reload --port 8000
+```
+
+#### Step 3: Start Next.js Frontend
+```bash
+cd frontend
+npm run dev
+```
+Navigate to `http://localhost:3000` and select the **⚡ Hyperledger Fabric DLT & Demo** tab to interact with the real ledger and run the 9-step demo!
+
+---
+
+## 8. Automated Test Suite (16 Fabric DLT + 19 Platform Tests)
+
+The test suite runs automated tests covering all engines, API routes, RBAC isolation, and ledger verification:
+
+### 8.1 Hyperledger Fabric 16-Scenario Specification Suite:
+```bash
+pytest backend/tests/test_fabric_rec.py -v
+```
+**All 16 Scenarios Verified on Live Fabric Ledger:**
+1. `test_01_create_rec`: Successful issuance on Fabric by IssuerOrgMSP.
+2. `test_02_duplicate_rec_creation`: Duplicate REC ID rejected.
+3. `test_03_invalid_rec_quantity`: Zero/negative quantities rejected.
+4. `test_04_unauthorized_rec_creation`: BuyerOrg unauthorized creation rejected.
+5. `test_05_valid_transfer`: P2P active balance transfer between accounts.
+6. `test_06_transfer_greater_than_balance`: Smart contract rejects insufficient balance.
+7. `test_07_unauthorized_transfer`: Non-owner transfer rejected.
+8. `test_08_valid_retirement`: Permanent Scope 2 retirement of active units.
+9. `test_09_retirement_greater_than_balance`: Retirement exceeding balance rejected.
+10. `test_10_transfer_retired_rec`: Attempt to transfer retired units rejected.
+11. `test_11_cancel_rec`: Regulator cancels certificate.
+12. `test_12_transfer_cancelled_rec`: Transfer of cancelled certificate rejected.
+13. `test_13_duplicate_document_hash`: Fraud engine catches reused document hash (double-counting).
+14. `test_14_rec_history`: Complete chronological block timeline retrieved from ledger.
+15. `test_15_authorization_by_organization`: Auditor read-only enforcement; mutations rejected.
+16. `test_16_ledger_query_and_verify`: State verification and conservation law checks.
+
+### 8.2 Core Intelligence Platform Suite:
+```bash
+pytest backend/tests/test_api.py backend/tests/test_engines.py -v
 ```
 
 ### Verified Test Cases:

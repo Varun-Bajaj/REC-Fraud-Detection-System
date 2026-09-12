@@ -1,0 +1,195 @@
+---
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: organizations/ordererOrganizations/rec.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.rec.com:7050
+
+  - &RegulatorOrg
+    Name: RegulatorOrg
+    ID: RegulatorOrgMSP
+    MSPDir: organizations/peerOrganizations/regulator.rec.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('RegulatorOrgMSP.admin', 'RegulatorOrgMSP.peer', 'RegulatorOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('RegulatorOrgMSP.admin', 'RegulatorOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('RegulatorOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('RegulatorOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.regulator.rec.com
+        Port: 7051
+
+  - &IssuerOrg
+    Name: IssuerOrg
+    ID: IssuerOrgMSP
+    MSPDir: organizations/peerOrganizations/issuer.rec.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('IssuerOrgMSP.admin', 'IssuerOrgMSP.peer', 'IssuerOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('IssuerOrgMSP.admin', 'IssuerOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('IssuerOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('IssuerOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.issuer.rec.com
+        Port: 8051
+
+  - &BuyerOrg
+    Name: BuyerOrg
+    ID: BuyerOrgMSP
+    MSPDir: organizations/peerOrganizations/buyer.rec.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('BuyerOrgMSP.admin', 'BuyerOrgMSP.peer', 'BuyerOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('BuyerOrgMSP.admin', 'BuyerOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('BuyerOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('BuyerOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.buyer.rec.com
+        Port: 9051
+
+  - &AuditorOrg
+    Name: AuditorOrg
+    ID: AuditorOrgMSP
+    MSPDir: organizations/peerOrganizations/auditor.rec.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('AuditorOrgMSP.admin', 'AuditorOrgMSP.peer', 'AuditorOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('AuditorOrgMSP.admin', 'AuditorOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('AuditorOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('AuditorOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.auditor.rec.com
+        Port: 10051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.rec.com:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 100
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  RECChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      OrdererType: etcdraft
+      EtcdRaft:
+        Consenters:
+          - Host: orderer.rec.com
+            Port: 7050
+            ClientTLSCert: organizations/ordererOrganizations/rec.com/orderers/orderer.rec.com/tls/server.crt
+            ServerTLSCert: organizations/ordererOrganizations/rec.com/orderers/orderer.rec.com/tls/server.crt
+      Organizations:
+        - *OrdererOrg
+      Capabilities: *OrdererCapabilities
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *RegulatorOrg
+        - *IssuerOrg
+        - *BuyerOrg
+        - *AuditorOrg
+      Capabilities: *ApplicationCapabilities

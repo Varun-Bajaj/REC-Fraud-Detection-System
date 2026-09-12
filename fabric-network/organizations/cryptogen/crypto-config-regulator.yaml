@@ -1,0 +1,12 @@
+PeerOrgs:
+  - Name: RegulatorOrg
+    Domain: regulator.rec.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+        - peer0.regulator.rec.com
+    Users:
+      Count: 1

@@ -1,0 +1,12 @@
+PeerOrgs:
+  - Name: BuyerOrg
+    Domain: buyer.rec.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+        - peer0.buyer.rec.com
+    Users:
+      Count: 1

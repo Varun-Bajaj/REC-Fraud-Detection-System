@@ -46,7 +46,10 @@ import {
   Database,
   Building,
   Radio,
+  Bot,
+  Sparkles,
 } from "lucide-react";
+import { FabricLedgerDashboard } from "@/components/FabricLedgerDashboard";
 
 // Institutional Demo Personas for Quick Access
 const DEMO_PERSONAS = {
@@ -109,6 +112,27 @@ export default function Home() {
   const [transferToUserId, setTransferToUserId] = useState("3");
   const [adjudicateAction, setAdjudicateAction] = useState<"CONFIRM_FRAUD_HOLD" | "CLEAR_AND_ISSUE">("CONFIRM_FRAUD_HOLD");
   const [adjudicateNotes, setAdjudicateNotes] = useState("");
+  const [aiAgentLoading, setAiAgentLoading] = useState(false);
+  const [aiAgentResult, setAiAgentResult] = useState<any>(null);
+
+  const handleRunAiInvestigation = async (caseId: number) => {
+    setAiAgentLoading(true);
+    setAiAgentResult(null);
+    try {
+      const res = await ApiService.aiInvestigateCase(caseId);
+      setAiAgentResult(res);
+      if (res.agent_verdict) {
+        setAdjudicateAction(res.agent_verdict as any);
+      }
+      if (res.agent_reasoning) {
+        setAdjudicateNotes(res.agent_reasoning);
+      }
+    } catch (err: any) {
+      alert("AI Agent investigation failed: " + err.message);
+    } finally {
+      setAiAgentLoading(false);
+    }
+  };
 
   // New Claim Form
   const [newClaimPlantId, setNewClaimPlantId] = useState<number>(1);
@@ -611,6 +635,7 @@ export default function Home() {
             <>
               {[
                 { id: "dashboard", label: "Fraud Radar (Macro)" },
+                { id: "fabric-dlt", label: "⚡ Hyperledger Fabric DLT & Demo" },
                 { id: "lineage", label: "Certificate Explorer & Timeline" },
                 { id: "cases", label: `Regulatory Cases (${cases.filter(c => c.status === "OPEN").length})` },
                 { id: "claims", label: "All Claims & AI Audit" },
@@ -636,6 +661,7 @@ export default function Home() {
             <>
               {[
                 { id: "dashboard", label: "Generation Overview" },
+                { id: "fabric-dlt", label: "⚡ Hyperledger Fabric DLT & Demo" },
                 { id: "lineage", label: "Certificate Explorer & Timeline" },
                 { id: "claims", label: `My Claims (${claims.length})` },
                 { id: "certificates", label: `REC Wallet (${certificates.length})` },
@@ -725,6 +751,11 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* TAB: HYPERLEDGER FABRIC DLT & DEMO SCENARIO */}
+            {activeTab === "fabric-dlt" && (
+              <FabricLedgerDashboard />
             )}
 
             {/* TAB: CERTIFICATE & CLAIM LINEAGE EXPLORER (The Core Feature) */}
@@ -1588,6 +1619,53 @@ export default function Home() {
                   <span className="text-slate-400">Case Priority:</span>
                   <span className="font-mono text-rose-400 font-bold">{selectedCase.priority}</span>
                 </div>
+              </div>
+
+              {/* LangGraph Autonomous AI Forensic Agent Trigger */}
+              <div className="p-3 bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-slate-900 rounded-xl border border-purple-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-purple-300 text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <span>LangGraph Multi-Agent Forensic Investigation</span>
+                    </div>
+                    <p className="text-[10px] text-purple-300/70 mt-0.5">
+                      Autonomous cross-check: Clean energy registry + Satellite weather irradiance
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRunAiInvestigation(selectedCase.id)}
+                    disabled={aiAgentLoading}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {aiAgentLoading ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
+                    <span>{aiAgentLoading ? "Investigating..." : "Run AI Agent"}</span>
+                  </button>
+                </div>
+
+                {aiAgentResult && (
+                  <div className="mt-2 p-2.5 bg-slate-950/80 rounded-lg border border-purple-500/40 space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Agent Verdict:</span>
+                      <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${aiAgentResult.agent_verdict === 'CONFIRM_FRAUD_HOLD' ? 'bg-rose-950 text-rose-300 border border-rose-700' : 'bg-emerald-950 text-emerald-300 border border-emerald-700'}`}>
+                        {aiAgentResult.agent_verdict} (Score: {aiAgentResult.agent_risk_score})
+                      </span>
+                    </div>
+                    {aiAgentResult.weather_evidence && (
+                      <div className="text-[10px] text-slate-300 flex justify-between">
+                        <span className="text-slate-400">Atmospheric Irradiance:</span>
+                        <span>{aiAgentResult.weather_evidence.avg_solar_radiation_w_m2} W/m² ({aiAgentResult.weather_evidence.irradiance_quality})</span>
+                      </div>
+                    )}
+                    {aiAgentResult.registry_evidence && (
+                      <div className="text-[10px] text-slate-300 flex justify-between">
+                        <span className="text-slate-400">Registry Accredited:</span>
+                        <span>{aiAgentResult.registry_evidence.accredited_id} ({aiAgentResult.registry_evidence.accredited_capacity_mw} MW)</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>

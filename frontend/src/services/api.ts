@@ -212,6 +212,21 @@ export class ApiService {
     });
   }
 
+  static async aiInvestigateCase(caseId: number): Promise<{
+    case_id: number;
+    case_number: string;
+    agent_verdict: string;
+    agent_risk_score: number;
+    violations: string[];
+    agent_reasoning: string;
+    registry_evidence: any;
+    weather_evidence: any;
+  }> {
+    return this.request(`/investigations/${caseId}/ai-investigate`, {
+      method: "POST",
+    });
+  }
+
   // Ledger & Verification
   static async getLedgerBlocks(limit = 100): Promise<LedgerBlock[]> {
     return this.request<LedgerBlock[]>(`/ledger/blocks?limit=${limit}`);
@@ -236,4 +251,120 @@ export class ApiService {
       body: formData,
     });
   }
+
+  // --- Hyperledger Fabric Permissioned Ledger Methods ---
+
+  static async listFabricRECs(): Promise<any[]> {
+    return this.request<any[]>("/rec");
+  }
+
+  static async getFabricREC(recId: string): Promise<any> {
+    return this.request<any>(`/rec/${recId}`);
+  }
+
+  static async createFabricREC(payload: {
+    recId: string;
+    generatorId: string;
+    energySource: string;
+    generationDate: string;
+    generationMWh: number;
+    issuedQuantity: number;
+    documentHash: string;
+  }): Promise<any> {
+    return this.request<any>("/rec", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async transferFabricREC(
+    recId: string,
+    payload: {
+      fromOwner: string;
+      toOwner: string;
+      quantity: number;
+      transactionReference?: string;
+      callerOrg?: string;
+    }
+  ): Promise<any> {
+    return this.request<any>(`/rec/${recId}/transfer`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async retireFabricREC(
+    recId: string,
+    payload: {
+      owner: string;
+      quantity: number;
+      retirementReason?: string;
+      callerOrg?: string;
+    }
+  ): Promise<any> {
+    return this.request<any>(`/rec/${recId}/retire`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async cancelFabricREC(
+    recId: string,
+    payload: {
+      reason?: string;
+      callerOrg?: string;
+    }
+  ): Promise<any> {
+    return this.request<any>(`/rec/${recId}/cancel`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async getFabricRECHistory(recId: string): Promise<{ recId: string; totalEvents: number; history: any[] }> {
+    return this.request<any>(`/rec/${recId}/history`);
+  }
+
+  static async verifyFabricREC(recId: string): Promise<any> {
+    return this.request<any>(`/rec/${recId}/verify`);
+  }
+
+  static async uploadFabricDocument(file: File): Promise<{
+    file_name: string;
+    document_hash: string;
+    file_size_bytes: number;
+    storage_path: string;
+    message: string;
+  }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return this.request("/documents/upload", {
+      method: "POST",
+      body: formData,
+    });
+  }
+
+  static async verifyFabricDocument(
+    recId: string,
+    file: File
+  ): Promise<{
+    match: boolean;
+    status: string;
+    message: string;
+    computed_hash: string;
+    registered_hash: string;
+    disclaimer: string;
+  }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return this.request(`/rec/${recId}/verify-document`, {
+      method: "POST",
+      body: formData,
+    });
+  }
+
+  static async getFabricFraudAlerts(): Promise<any[]> {
+    return this.request<any[]>("/fraud/alerts");
+  }
 }
+

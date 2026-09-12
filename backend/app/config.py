@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,8 +16,15 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
+    # Groq AI Settings
+    GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY", None)
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./rec_guardian.db")
+
+    # Fabric DLT Gateway
+    FABRIC_GATEWAY_URL: str = os.getenv("FABRIC_GATEWAY_URL", "http://localhost:5050")
 
     # Document Uploads
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
@@ -39,7 +47,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
-        env_file=".env",
+        env_file=(".env", "backend/.env"),
         extra="ignore",
     )
 

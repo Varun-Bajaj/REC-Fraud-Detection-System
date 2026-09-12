@@ -7,6 +7,7 @@ from app.api.v1.certificates import router as certificates_router
 from app.api.v1.investigations import router as investigations_router
 from app.api.v1.ledger import router as ledger_router
 from app.api.v1.analytics import router as analytics_router
+from app.api.v1.rec import router as rec_router
 
 api_router = APIRouter()
 
@@ -18,5 +19,6 @@ api_router.include_router(certificates_router)
 api_router.include_router(investigations_router)
 api_router.include_router(ledger_router)
 api_router.include_router(analytics_router)
+api_router.include_router(rec_router)
 
-__all__ = ["api_router"]
+__all__ = ["api_router", "rec_router"]

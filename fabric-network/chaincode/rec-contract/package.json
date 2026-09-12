@@ -1,0 +1,25 @@
+{
+  "name": "rec-contract",
+  "version": "1.0.0",
+  "description": "Hyperledger Fabric Smart Contract for Renewable Energy Certificate (REC) Fraud Detection and Tracking",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "start": "fabric-chaincode-node server --chaincode-address=0.0.0.0:9999",
+    "test": "mocha dist/test --recursive"
+  },
+  "dependencies": {
+    "fabric-contract-api": "^2.5.4",
+    "fabric-shim": "^2.5.4"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^18.19.18",
+    "chai": "^4.4.1",
+    "mocha": "^10.3.0",
+    "typescript": "~5.3.3"
+  }
+}

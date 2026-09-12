@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from app.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.api.v1 import api_router
+from app.api.v1.rec import router as rec_router
 from app.engines.ledger_engine import LedgerEngine
 from app.seeds.seed_data import seed_database
 
@@ -56,6 +57,8 @@ if os.path.exists(static_dir):
 
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+# Include Fabric REC router at /api for exact specification compliance
+app.include_router(rec_router, prefix="/api")
 
 
 @app.get("/", tags=["Frontend"])

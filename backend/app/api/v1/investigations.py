@@ -171,3 +171,129 @@ def make_regulator_decision(
     db.commit()
     db.refresh(case)
     return case
+
+
+@router.post("/{case_id}/ai-investigate")
+async def run_langgraph_investigation(
+    case_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.REGULATOR, UserRole.AUDITOR, UserRole.ADMIN])),
+):
+    """
+    Triggers an autonomous LangGraph multi-agent forensic investigation on a case.
+    Uses pure-Python registry & satellite weather tools (Device Guard compliant).
+    """
+    case = db.query(InvestigationCase).filter(InvestigationCase.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Investigation case not found.")
+
+    claim = case.claim
+    meter_reading = getattr(claim, 'meter_reading', None)
+    meter_mwh = meter_reading.energy_generated_mwh if meter_reading else 0.0
+
+    from app.agents.forensic_graph import forensic_investigation_graph
+
+    initial_state = {
+        "claim_id": claim.id,
+        "claim_uid": claim.claim_uid,
+        "plant_name": claim.plant.name if claim.plant else "Unknown Facility",
+        "claimed_mwh": float(claim.claimed_mwh),
+        "meter_mwh": float(meter_mwh),
+        "latitude": float(claim.plant.latitude) if claim.plant and claim.plant.latitude else 35.0,
+        "longitude": float(claim.plant.longitude) if claim.plant and claim.plant.longitude else -115.0,
+        "registry_data": {},
+        "weather_data": {},
+        "violations": [],
+        "risk_score": 0.0,
+        "verdict": "",
+        "reasoning": "",
+    }
+
+    result = await forensic_investigation_graph.ainvoke(initial_state)
+
+    # Save agent findings back to case notes
+    case.findings = result.get("reasoning", "")
+    db.commit()
+    db.refresh(case)
+
+    return {
+        "case_id": case.id,
+        "case_number": case.case_number,
+        "agent_verdict": result.get("verdict"),
+        "agent_risk_score": result.get("risk_score"),
+        "violations": result.get("violations", []),
+        "agent_reasoning": result.get("reasoning"),
+        "registry_evidence": result.get("registry_data"),
+        "weather_evidence": result.get("weather_data"),
+    }
+
+
+@router.post("/{case_id}/ai-investigate-offline")
+async def run_offline_groq_investigation(
+    case_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.REGULATOR, UserRole.AUDITOR, UserRole.ADMIN])),
+):
+    """
+    Triggers Groq LPU + LangGraph forensic analysis for offline or paper-issued certificates.
+    Scrutinizes document text, catches duplicate serials, and performs satellite thermodynamic validation.
+    """
+    case = db.query(InvestigationCase).filter(InvestigationCase.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Investigation case not found.")
+
+    claim = case.claim
+    plant = claim.plant
+
+    doc_text = ""
+    file_sha256 = claim.submission_fingerprint
+    if claim.documents:
+        doc_text = f"Attached Document: {claim.documents[0].file_name} (Hash: {claim.documents[0].file_hash})"
+    else:
+        doc_text = f"Manual offline claim submitted by user {claim.submitted_by_user_id} for {claim.claimed_mwh} MWh."
+
+    from app.agents.offline_certificate_graph import offline_certificate_graph
+
+    state_input = {
+        "certificate_id": f"OFFLINE-CLAIM-{claim.claim_uid}",
+        "raw_document_text": doc_text,
+        "file_sha256": file_sha256,
+        "plant_name": plant.name if plant else "Unknown Facility",
+        "fuel_type": plant.fuel_type.value if plant else "SOLAR",
+        "capacity_mw": float(plant.capacity_mw) if plant else 50.0,
+        "claimed_mwh": float(claim.claimed_mwh),
+        "vintage_start": claim.period_start.strftime("%Y-%m-%d"),
+        "vintage_end": claim.period_end.strftime("%Y-%m-%d"),
+        "latitude": float(plant.latitude) if plant and plant.latitude else 35.0,
+        "longitude": float(plant.longitude) if plant and plant.longitude else -115.0,
+        "extracted_metadata": {},
+        "document_anomalies": [],
+        "duplicate_check": {},
+        "satellite_weather": {},
+        "statutory_violations": [],
+        "fraud_risk_score": 0.0,
+        "verdict": "",
+        "executive_summary": "",
+        "groq_engine_used": False,
+    }
+
+    result = await offline_certificate_graph.ainvoke(state_input)
+
+    case.findings = f"Groq Offline Audit:\n{result.get('executive_summary', '')}"
+    db.commit()
+    db.refresh(case)
+
+    return {
+        "case_id": case.id,
+        "case_number": case.case_number,
+        "verdict": result.get("verdict"),
+        "fraud_risk_score": result.get("fraud_risk_score"),
+        "groq_engine_used": result.get("groq_engine_used"),
+        "executive_summary": result.get("executive_summary"),
+        "document_anomalies": result.get("document_anomalies", []),
+        "statutory_violations": result.get("statutory_violations", []),
+        "duplicate_check": result.get("duplicate_check", {}),
+        "satellite_weather": result.get("satellite_weather", {}),
+    }
+
+

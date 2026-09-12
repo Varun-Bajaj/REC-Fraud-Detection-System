@@ -21,6 +21,7 @@ from app.models.investigation import (
     DecisionAction,
 )
 from app.models.ledger import LedgerBlock, LedgerEventType
+from app.models.fabric_rec import FabricRECRecord, FabricFraudAlert
 
 __all__ = [
     "User",
@@ -44,4 +45,6 @@ __all__ = [
     "DecisionAction",
     "LedgerBlock",
     "LedgerEventType",
+    "FabricRECRecord",
+    "FabricFraudAlert",
 ]

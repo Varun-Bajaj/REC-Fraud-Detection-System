@@ -1,0 +1,12 @@
+PeerOrgs:
+  - Name: IssuerOrg
+    Domain: issuer.rec.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+        - peer0.issuer.rec.com
+    Users:
+      Count: 1
