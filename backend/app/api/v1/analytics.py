@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.plant import Plant
 from app.models.claim import CertificateClaim, ClaimStatus, RiskLevel
 from app.models.certificate import Certificate, CertificateTransfer, CertificateStatus, TransferType
@@ -27,9 +27,33 @@ def get_dashboard_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Retrieve system-wide fraud intelligence metrics and volume KPIs."""
-    total_plants = db.query(Plant).count()
+    if current_user.role == UserRole.GENERATOR:
+        # Generator sees portfolio specific metrics
+        total_plants = db.query(Plant).filter(Plant.owner_id == current_user.id).count()
+        claims = db.query(CertificateClaim).filter(CertificateClaim.submitted_by_user_id == current_user.id).all()
+        certs = db.query(Certificate).filter(Certificate.current_owner_id == current_user.id).all()
+        claim_ids = [c.id for c in claims]
+        open_cases = (
+            db.query(InvestigationCase)
+            .filter(
+                InvestigationCase.claim_id.in_(claim_ids),
+                InvestigationCase.status.in_([CaseStatus.OPEN, CaseStatus.UNDER_INVESTIGATION]),
+            )
+            .count()
+            if claim_ids
+            else 0
+        )
+    else:
+        # Regulators, Auditors, and Admins see macro market-wide forensic metrics
+        total_plants = db.query(Plant).count()
+        claims = db.query(CertificateClaim).all()
+        certs = db.query(Certificate).all()
+        open_cases = (
+            db.query(InvestigationCase)
+            .filter(InvestigationCase.status.in_([CaseStatus.OPEN, CaseStatus.UNDER_INVESTIGATION]))
+            .count()
+        )
 
-    claims = db.query(CertificateClaim).all()
     total_claims = len(claims)
     total_mwh_claimed = sum(c.claimed_mwh for c in claims)
 
@@ -45,19 +69,12 @@ def get_dashboard_stats(
         "CRITICAL": sum(1 for c in claims if c.risk_level == RiskLevel.CRITICAL),
     }
 
-    certs = db.query(Certificate).all()
     total_certificates_issued = len(certs)
     total_mwh_issued = sum(c.mwh for c in certs)
     total_certificates_redeemed = sum(1 for c in certs if c.status == CertificateStatus.REDEEMED)
 
     transfers = db.query(CertificateTransfer).filter(CertificateTransfer.transfer_type == TransferType.TRANSFER).all()
     total_transfers = len(transfers)
-
-    open_cases = (
-        db.query(InvestigationCase)
-        .filter(InvestigationCase.status.in_([CaseStatus.OPEN, CaseStatus.UNDER_INVESTIGATION]))
-        .count()
-    )
 
     return DashboardStatsResponse(
         total_plants=total_plants,

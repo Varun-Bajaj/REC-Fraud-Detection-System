@@ -58,6 +58,42 @@ export class ApiService {
   }
 
   // Auth
+  static async loginJson(email: string, password = "password123"): Promise<{ access_token: string; user: User }> {
+    const res = await fetch(`${API_BASE}/auth/login-json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Authentication failed" }));
+      throw new Error(err.detail || "Authentication failed");
+    }
+    const data = await res.json();
+    this.setToken(data.access_token);
+    return data;
+  }
+
+  static async register(userData: {
+    email: string;
+    password: string;
+    full_name: string;
+    organization_name?: string;
+    role?: string;
+  }): Promise<User> {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userData),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Registration failed" }));
+      throw new Error(err.detail || "Registration failed");
+    }
+    return res.json();
+  }
+
   static async login(username: string, password = "password123"): Promise<{ access_token: string; user: User }> {
     const formData = new URLSearchParams();
     formData.append("username", username);
@@ -73,6 +109,10 @@ export class ApiService {
     const data = await res.json();
     this.setToken(data.access_token);
     return data;
+  }
+
+  static logout() {
+    this.setToken(null);
   }
 
   static async getMe(): Promise<User> {

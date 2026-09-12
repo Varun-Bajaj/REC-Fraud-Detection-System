@@ -29,6 +29,74 @@ def test_auth_login(client):
     assert data["user"]["role"] == "ADMIN"
 
 
+def test_auth_login_json_and_roles(client):
+    """Test login-json for both Generator and Regulator personas."""
+    # 1. Generator login
+    res_gen = client.post(
+        "/api/v1/auth/login-json",
+        json={"email": "generator@solarfarm.com", "password": "password123"},
+    )
+    assert res_gen.status_code == 200
+    gen_data = res_gen.json()
+    assert gen_data["user"]["role"] == "GENERATOR"
+    assert "access_token" in gen_data
+    gen_token = gen_data["access_token"]
+
+    # 2. Regulator login
+    res_reg = client.post(
+        "/api/v1/auth/login-json",
+        json={"email": "regulator@recguardian.org", "password": "password123"},
+    )
+    assert res_reg.status_code == 200
+    reg_data = res_reg.json()
+    assert reg_data["user"]["role"] == "REGULATOR"
+    assert "access_token" in reg_data
+
+    # 3. Generator scoped dashboard
+    res_dash = client.get(
+        "/api/v1/analytics/dashboard",
+        headers={"Authorization": f"Bearer {gen_token}"},
+    )
+    assert res_dash.status_code == 200
+    dash_data = res_dash.json()
+    assert dash_data["total_plants"] == 2  # Generator only sees their 2 plants
+
+    # 4. RBAC: Generator cannot adjudicate
+    res_adj = client.post(
+        "/api/v1/investigations/1/decision",
+        json={"decision_action": "CONFIRM_FRAUD_HOLD", "findings": "Unauthorized test"},
+        headers={"Authorization": f"Bearer {gen_token}"},
+    )
+    assert res_adj.status_code == 403
+
+
+def test_auth_registration(client):
+    """Test self-registration for clean energy producers."""
+    unique_email = "new_clean_producer@solarfarm.org"
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": unique_email,
+            "password": "SecurePassword123!",
+            "full_name": "Dr. Sarah Lin",
+            "organization_name": "Pacific Clean Energy",
+            "role": "GENERATOR",
+        },
+    )
+    assert res.status_code == 201
+    user_info = res.json()
+    assert user_info["email"] == unique_email
+    assert user_info["role"] == "GENERATOR"
+
+    # Verify logging into newly registered account
+    login_res = client.post(
+        "/api/v1/auth/login-json",
+        json={"email": unique_email, "password": "SecurePassword123!"},
+    )
+    assert login_res.status_code == 200
+    assert login_res.json()["user"]["email"] == unique_email
+
+
 def test_list_plants(client):
     """Test fetching registered plants."""
     token = get_token(client, "regulator@recguardian.org")
@@ -130,10 +198,49 @@ def test_certificate_lifecycle(client):
     certs = certs_res.json()
     assert len(certs) > 0
 
-    # Pick an available unredeemed certificate
+    # Pick an available unredeemed certificate or create one
     unredeemed = [c for c in certs if c["status"] != "REDEEMED"]
-    assert len(unredeemed) > 0
-    cert = unredeemed[0]
+    if not unredeemed:
+        # Create a fresh certificate for testing
+        from app.core.database import SessionLocal
+        from app.models.certificate import Certificate, CertificateStatus
+        from app.models.claim import CertificateClaim, ClaimStatus, RiskLevel
+        from app.models.plant import Plant, FuelType
+        import uuid
+        db = SessionLocal()
+        plant = db.query(Plant).first()
+        test_claim = CertificateClaim(
+            claim_uid=f"CLM-TEST-{uuid.uuid4().hex[:6]}",
+            plant_id=plant.id,
+            submitted_by_user_id=plant.owner_id,
+            period_start=datetime.now(timezone.utc),
+            period_end=datetime.now(timezone.utc),
+            claimed_mwh=100.0,
+            submission_fingerprint=f"fp_{uuid.uuid4().hex}",
+            status=ClaimStatus.APPROVED,
+            risk_score=5.0,
+            risk_level=RiskLevel.LOW,
+        )
+        db.add(test_claim)
+        db.flush()
+        new_cert = Certificate(
+            certificate_uid=f"REC-TEST-{uuid.uuid4().hex[:6]}",
+            claim_id=test_claim.id,
+            plant_id=plant.id,
+            current_owner_id=plant.owner_id,
+            fuel_type=FuelType.SOLAR,
+            mwh=100.0,
+            vintage_year=2026,
+            vintage_month=1,
+            status=CertificateStatus.ISSUED,
+        )
+        db.add(new_cert)
+        db.commit()
+        db.refresh(new_cert)
+        cert = {"id": new_cert.id, "status": "ISSUED"}
+        db.close()
+    else:
+        cert = unredeemed[0]
 
     # Transfer from current owner (via admin permission) to trader
     trader_token = get_token(client, "trader@energytrade.com")

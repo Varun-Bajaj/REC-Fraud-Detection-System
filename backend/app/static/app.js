@@ -2,15 +2,19 @@ const { useState, useEffect, useRef } = React;
 
 const API_BASE = "/api/v1";
 
-// Default demo credentials
-const DEMO_USERS = [
-  { label: "Admin", email: "admin@recguardian.org", role: "ADMIN", icon: "fa-crown", color: "purple" },
-  { label: "Regulator", email: "regulator@recguardian.org", role: "REGULATOR", icon: "fa-shield-halved", color: "blue" },
-  { label: "Auditor", email: "auditor@recguardian.org", role: "AUDITOR", icon: "fa-magnifying-glass-chart", color: "amber" },
-  { label: "Solar Gen", email: "generator@solarfarm.com", role: "GENERATOR", icon: "fa-solar-panel", color: "emerald" },
-  { label: "Wind Gen", email: "generator2@windpower.com", role: "GENERATOR", icon: "fa-wind", color: "cyan" },
-  { label: "REC Trader", email: "trader@energytrade.com", role: "GENERATOR", icon: "fa-arrow-right-arrow-left", color: "indigo" },
-];
+// Demo user profiles
+const DEMO_PORTALS = {
+  USER: [
+    { label: "Solar Generator (Helios LLC)", email: "generator@solarfarm.com", role: "GENERATOR", org: "Helios Solar Generation LLC", icon: "fa-solar-panel", color: "emerald" },
+    { label: "Wind Generator (Boreas Ltd)", email: "generator2@windpower.com", role: "GENERATOR", org: "Boreas Wind Energy Ltd", icon: "fa-wind", color: "cyan" },
+    { label: "Energy Trader (Global Exchange)", email: "trader@energytrade.com", role: "GENERATOR", org: "Global Carbon & REC Exchange", icon: "fa-arrow-right-arrow-left", color: "indigo" },
+  ],
+  REGULATOR: [
+    { label: "Regulatory Officer (RERC)", email: "regulator@recguardian.org", role: "REGULATOR", org: "Renewable Energy Regulatory Commission", icon: "fa-shield-halved", color: "blue" },
+    { label: "Senior Forensic Auditor", email: "auditor@recguardian.org", role: "AUDITOR", org: "Apex Forensic ESG Audit Group", icon: "fa-magnifying-glass-chart", color: "amber" },
+    { label: "System Administrator", email: "admin@recguardian.org", role: "ADMIN", org: "REC Guardian Authority", icon: "fa-crown", color: "purple" },
+  ],
+};
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -22,6 +26,7 @@ function App() {
   // Data states
   const [dashboardStats, setDashboardStats] = useState(null);
   const [claims, setClaims] = useState([]);
+  const [certificates, setCertificates] = useState([]);
   const [plants, setPlants] = useState([]);
   const [investigations, setInvestigations] = useState([]);
   const [ledgerBlocks, setLedgerBlocks] = useState([]);
@@ -31,10 +36,11 @@ function App() {
   // Modals
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [showClaimModal, setShowClaimModal] = useState(false);
+  const [transferringCert, setTransferringCert] = useState(null);
   const [docVerifyResult, setDocVerifyResult] = useState(null);
   const [docVerifyLoading, setDocVerifyLoading] = useState(false);
 
-  // Helper fetch with auth
+  // Helper fetch with JWT authorization header
   const apiFetch = async (endpoint, options = {}) => {
     const headers = {
       ...(options.headers || {}),
@@ -47,31 +53,42 @@ function App() {
     }
     const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({ detail: "Request failed" }));
+      if (res.status === 401) {
+        // Token expired or invalid -> logout to login screen
+        handleLogout();
+        throw new Error("Session expired. Please log in again.");
+      }
+      const errData = await res.json().catch(() => ({ detail: "API request failed" }));
       throw new Error(errData.detail || "API request failed");
     }
     return res.json();
   };
 
   // Login handler
-  const loginAs = async (email, password = "password123") => {
+  const handleLogin = async (email, password = "password123") => {
     try {
       setLoading(true);
       setError(null);
-      const formData = new URLSearchParams();
-      formData.append("username", email);
-      formData.append("password", password);
-
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await fetch(`${API_BASE}/auth/login-json`, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString(),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (!res.ok) throw new Error("Login failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Invalid credentials" }));
+        throw new Error(err.detail || "Login failed");
+      }
       const data = await res.json();
       setToken(data.access_token);
       setCurrentUser(data.user);
       localStorage.setItem("rec_token", data.access_token);
+
+      // Default tab based on role
+      if (data.user.role === "GENERATOR") {
+        setActiveTab("dashboard");
+      } else {
+        setActiveTab("dashboard");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -79,36 +96,52 @@ function App() {
     }
   };
 
-  // Check auth on load
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem("rec_token");
+    setToken("");
+    setCurrentUser(null);
+    setDashboardStats(null);
+    setClaims([]);
+    setCertificates([]);
+    setInvestigations([]);
+  };
+
+  // Check auth session on load
   useEffect(() => {
     if (token) {
       apiFetch("/auth/me")
         .then((user) => setCurrentUser(user))
         .catch(() => {
-          localStorage.removeItem("rec_token");
-          setToken("");
-          loginAs("regulator@recguardian.org");
+          handleLogout();
         });
-    } else {
-      loginAs("regulator@recguardian.org");
     }
   }, [token]);
 
-  // Load active tab data
+  // Load data for active tab
   const loadData = async () => {
-    if (!token) return;
+    if (!token || !currentUser) return;
     try {
       if (activeTab === "dashboard") {
         const stats = await apiFetch("/analytics/dashboard");
         setDashboardStats(stats);
         const clm = await apiFetch("/claims/?limit=10");
         setClaims(clm);
+        if (currentUser.role === "GENERATOR") {
+          const certs = await apiFetch("/certificates/");
+          setCertificates(certs);
+        }
       } else if (activeTab === "claims") {
         const clm = await apiFetch("/claims/?limit=50");
         setClaims(clm);
+      } else if (activeTab === "wallet") {
+        const certs = await apiFetch("/certificates/");
+        setCertificates(certs);
       } else if (activeTab === "investigations") {
-        const inv = await apiFetch("/investigations/?limit=50");
-        setInvestigations(inv);
+        if (currentUser.role !== "GENERATOR") {
+          const inv = await apiFetch("/investigations/?limit=50");
+          setInvestigations(inv);
+        }
       } else if (activeTab === "network") {
         const net = await apiFetch("/analytics/network-graph");
         setNetworkGraphData(net);
@@ -130,94 +163,116 @@ function App() {
     loadData();
   }, [activeTab, currentUser]);
 
+  // IF NOT AUTHENTICATED: SHOW LOGIN PORTAL
+  if (!token || !currentUser) {
+    return (
+      <AuthGateway
+        onLogin={handleLogin}
+        loading={loading}
+        error={error}
+        apiFetch={apiFetch}
+      />
+    );
+  }
+
+  const isRegulatorOrAuditor = currentUser.role === "REGULATOR" || currentUser.role === "AUDITOR" || currentUser.role === "ADMIN";
+
   return (
     <div className="flex-1 flex flex-col">
       {/* Top Navbar */}
       <header className="bg-dark-850 border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
-              <i className="fa-solid fa-shield-halved text-white text-lg"></i>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+              isRegulatorOrAuditor
+                ? "bg-gradient-to-tr from-blue-600 to-sky-400 shadow-blue-500/20"
+                : "bg-gradient-to-tr from-brand-600 to-emerald-400 shadow-brand-500/20"
+            }`}>
+              <i className={`fa-solid ${isRegulatorOrAuditor ? "fa-shield-halved" : "fa-solar-panel"} text-white text-lg`}></i>
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-lg text-white tracking-tight">REC Guardian</span>
-                <span className="text-xs bg-brand-500/10 text-brand-400 border border-brand-500/30 px-2 py-0.5 rounded-full font-medium">AI & Ledger v1.0</span>
+                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold border uppercase ${
+                  isRegulatorOrAuditor
+                    ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                }`}>
+                  {currentUser.role} PORTAL
+                </span>
               </div>
-              <p className="text-xs text-slate-400 hidden sm:block">Renewable Energy Certificate Forensic Intelligence</p>
+              <p className="text-xs text-slate-400 hidden sm:block">
+                {isRegulatorOrAuditor
+                  ? "Sovereign Audit & Forensic Adjudication Authority"
+                  : `Producer & Market Participant Console • ${currentUser.organization_name || "Generator"}`}
+              </p>
             </div>
           </div>
 
-          {/* Role Switcher */}
+          {/* User Profile & Logout */}
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center bg-dark-900 border border-slate-700/60 rounded-xl p-1 text-xs">
-              <span className="px-2 text-slate-400 font-medium">Quick Role:</span>
-              {DEMO_USERS.map((u) => {
-                const isActive = currentUser && currentUser.email === u.email;
-                return (
-                  <button
-                    key={u.email}
-                    onClick={() => loginAs(u.email)}
-                    className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
-                      isActive
-                        ? "bg-brand-600 text-white font-medium shadow"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800"
-                    }`}
-                  >
-                    <i className={`fa-solid ${u.icon} text-[10px]`}></i>
-                    <span>{u.label}</span>
-                  </button>
-                );
-              })}
+            <div className="hidden sm:block text-right">
+              <div className="text-xs font-semibold text-white">{currentUser.full_name}</div>
+              <div className="text-[11px] text-slate-400">{currentUser.email}</div>
             </div>
 
-            {currentUser && (
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-700/50">
-                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-semibold text-brand-400">
-                  {currentUser.full_name.charAt(0)}
-                </div>
-                <div className="hidden lg:block text-left">
-                  <div className="text-xs font-medium text-white">{currentUser.full_name}</div>
-                  <div className="text-[10px] text-slate-400">{currentUser.role}</div>
-                </div>
-              </div>
-            )}
+            <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold ${
+              isRegulatorOrAuditor
+                ? "bg-blue-950 border-blue-700 text-blue-400"
+                : "bg-emerald-950 border-emerald-700 text-emerald-400"
+            }`}>
+              {currentUser.full_name.charAt(0)}
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="bg-dark-900 hover:bg-slate-800 text-slate-300 hover:text-rose-400 border border-slate-700/80 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5"
+              title="Sign out of REC Guardian"
+            >
+              <i className="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+              <span className="hidden md:inline">Sign Out</span>
+            </button>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Role-Based Navigation Tabs */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 border-t border-slate-800/80 overflow-x-auto">
-          {[
-            { id: "dashboard", label: "Intelligence Dashboard", icon: "fa-chart-pie" },
-            { id: "claims", label: "Claims & Fraud Radar", icon: "fa-clipboard-check", badge: claims.length },
-            { id: "investigations", label: "Forensic Cases", icon: "fa-scale-balanced", badge: dashboardStats?.open_investigation_cases },
-            { id: "network", label: "Transfer Graph (NetworkX)", icon: "fa-circle-nodes" },
-            { id: "ledger", label: "SHA-256 Ledger Audit", icon: "fa-link" },
-            { id: "plants", label: "Facilities & Meters", icon: "fa-industry" },
-          ].map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
+          {isRegulatorOrAuditor ? (
+            // REGULATOR / AUDITOR / ADMIN TABS
+            [
+              { id: "dashboard", label: "Macro Fraud Radar", icon: "fa-chart-pie" },
+              { id: "investigations", label: "Regulatory Cases (Adjudicate)", icon: "fa-scale-balanced", badge: dashboardStats?.open_investigation_cases },
+              { id: "claims", label: "Global Claims Audit", icon: "fa-clipboard-check", badge: claims.length },
+              { id: "network", label: "Transfer Loops (NetworkX)", icon: "fa-circle-nodes" },
+              { id: "ledger", label: "SHA-256 Ledger Audit", icon: "fa-link" },
+              { id: "plants", label: "All Power Facilities", icon: "fa-industry" },
+            ].map((tab) => (
+              <NavTabButton
                 key={tab.id}
+                tab={tab}
+                active={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-3 px-4 text-xs font-medium border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-                  active
-                    ? "border-brand-500 text-brand-400 bg-brand-500/5"
-                    : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
-                }`}
-              >
-                <i className={`fa-solid ${tab.icon}`}></i>
-                <span>{tab.label}</span>
-                {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    tab.id === "investigations" ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" : "bg-slate-800 text-slate-300"
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                isRegulator={true}
+              />
+            ))
+          ) : (
+            // USER / GENERATOR / TRADER TABS
+            [
+              { id: "dashboard", label: "Portfolio Overview", icon: "fa-chart-line" },
+              { id: "claims", label: "My Submitted Claims", icon: "fa-file-signature", badge: claims.length },
+              { id: "wallet", label: "Certificate Wallet (RECs)", icon: "fa-wallet", badge: certificates.length },
+              { id: "plants", label: "My Power Plants & Telemetry", icon: "fa-solar-panel" },
+              { id: "ledger", label: "Evidence Ledger Verification", icon: "fa-file-shield" },
+            ].map((tab) => (
+              <NavTabButton
+                key={tab.id}
+                tab={tab}
+                active={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                isRegulator={false}
+              />
+            ))
+          )}
         </div>
       </header>
 
@@ -233,30 +288,44 @@ function App() {
           </div>
         )}
 
-        {/* Tab 1: Dashboard */}
+        {/* Tab 1: Dashboard (Role Tailored) */}
         {activeTab === "dashboard" && (
           <DashboardTab
             stats={dashboardStats}
             recentClaims={claims}
+            certificates={certificates}
             onSelectClaim={(c) => setSelectedClaim(c)}
             onNewClaim={() => setShowClaimModal(true)}
+            onOpenTransfer={(c) => setTransferringCert(c)}
             currentUser={currentUser}
+            isRegulator={isRegulatorOrAuditor}
           />
         )}
 
-        {/* Tab 2: Claims */}
+        {/* Tab 2: Claims (Filtered to user if generator, global if regulator) */}
         {activeTab === "claims" && (
           <ClaimsTab
             claims={claims}
             onSelectClaim={(c) => setSelectedClaim(c)}
             onNewClaim={() => setShowClaimModal(true)}
             currentUser={currentUser}
+            isRegulator={isRegulatorOrAuditor}
             onReload={loadData}
           />
         )}
 
-        {/* Tab 3: Investigations */}
-        {activeTab === "investigations" && (
+        {/* Tab 3: Certificate Wallet (For Generators / Traders) */}
+        {activeTab === "wallet" && (
+          <WalletTab
+            certificates={certificates}
+            onOpenTransfer={(cert) => setTransferringCert(cert)}
+            apiFetch={apiFetch}
+            onReload={loadData}
+          />
+        )}
+
+        {/* Tab 4: Investigations (Regulators Only) */}
+        {activeTab === "investigations" && isRegulatorOrAuditor && (
           <InvestigationsTab
             investigations={investigations}
             apiFetch={apiFetch}
@@ -265,12 +334,12 @@ function App() {
           />
         )}
 
-        {/* Tab 4: Network Graph */}
+        {/* Tab 5: Network Graph (Regulators Only) */}
         {activeTab === "network" && (
           <NetworkGraphTab graphData={networkGraphData} onReload={loadData} />
         )}
 
-        {/* Tab 5: Ledger */}
+        {/* Tab 6: Ledger Audit & Document Verifier */}
         {activeTab === "ledger" && (
           <LedgerTab
             blocks={ledgerBlocks}
@@ -281,12 +350,18 @@ function App() {
             setDocVerifyResult={setDocVerifyResult}
             docVerifyLoading={docVerifyLoading}
             setDocVerifyLoading={setDocVerifyLoading}
+            isRegulator={isRegulatorOrAuditor}
           />
         )}
 
-        {/* Tab 6: Plants */}
+        {/* Tab 7: Plants */}
         {activeTab === "plants" && (
-          <PlantsTab plants={plants} apiFetch={apiFetch} onReload={loadData} />
+          <PlantsTab
+            plants={plants}
+            apiFetch={apiFetch}
+            onReload={loadData}
+            currentUser={currentUser}
+          />
         )}
       </main>
 
@@ -297,10 +372,11 @@ function App() {
           onClose={() => setSelectedClaim(null)}
           apiFetch={apiFetch}
           onReload={loadData}
+          isRegulator={isRegulatorOrAuditor}
         />
       )}
 
-      {/* New Claim Modal */}
+      {/* Submit Claim Modal */}
       {showClaimModal && (
         <SubmitClaimModal
           onClose={() => setShowClaimModal(false)}
@@ -312,14 +388,27 @@ function App() {
         />
       )}
 
+      {/* Transfer REC Modal */}
+      {transferringCert && (
+        <TransferModal
+          cert={transferringCert}
+          onClose={() => setTransferringCert(null)}
+          apiFetch={apiFetch}
+          onTransferred={() => {
+            setTransferringCert(null);
+            loadData();
+          }}
+        />
+      )}
+
       {/* Footer */}
       <footer className="bg-dark-850 border-t border-slate-800 text-xs text-slate-500 py-4 text-center mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>REC Guardian &copy; 2026 — Team KHATRON KE KHILADI (Varun, Kevin, Dhruv)</div>
           <div className="flex items-center gap-4 text-slate-400">
-            <span>FastAPI Backend: <span className="text-emerald-400">Live</span></span>
-            <span>SHA-256 Ledger: <span className="text-emerald-400">Synced</span></span>
-            <span>ML Isolation Forest: <span className="text-emerald-400">Active</span></span>
+            <span>JWT Security: <span className="text-emerald-400">HS256 Verified</span></span>
+            <span>Role RBAC: <span className="text-emerald-400">Enforced</span></span>
+            <span>Tamper-Evident Ledger: <span className="text-emerald-400">Live</span></span>
           </div>
         </div>
       </footer>
@@ -328,39 +417,378 @@ function App() {
 }
 
 // -------------------------------------------------------------
-// TAB 1: DASHBOARD
+// NAVIGATION TAB COMPONENT
 // -------------------------------------------------------------
-function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentUser }) {
-  if (!stats) return <div className="text-center py-20 text-slate-400">Loading intelligence metrics...</div>;
+function NavTabButton({ tab, active, onClick, isRegulator }) {
+  const activeColor = isRegulator
+    ? "border-blue-500 text-blue-400 bg-blue-500/5"
+    : "border-brand-500 text-brand-400 bg-brand-500/5";
+
+  return (
+    <button
+      onClick={onClick}
+      className={`py-3 px-4 text-xs font-medium border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+        active
+          ? activeColor
+          : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700"
+      }`}
+    >
+      <i className={`fa-solid ${tab.icon}`}></i>
+      <span>{tab.label}</span>
+      {tab.badge !== undefined && tab.badge > 0 && (
+        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+          tab.id === "investigations" ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" : "bg-slate-800 text-slate-300"
+        }`}>
+          {tab.badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// -------------------------------------------------------------
+// AUTHENTICATION GATEWAY (LOGIN FOR USER & REGULATOR)
+// -------------------------------------------------------------
+function AuthGateway({ onLogin, loading, error, apiFetch }) {
+  const [portalMode, setPortalMode] = useState("USER"); // "USER" or "REGULATOR"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("password123");
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [regFullName, setRegFullName] = useState("");
+  const [regOrgName, setRegOrgName] = useState("");
+  const [regError, setRegError] = useState(null);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!email) return;
+    onLogin(email, password);
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      setRegError(null);
+      await apiFetch("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: regFullName,
+          organization_name: regOrgName,
+          role: "GENERATOR",
+        }),
+      });
+      // Immediately log in with new credentials
+      onLogin(email, password);
+    } catch (err) {
+      setRegError(err.message);
+    }
+  };
+
+  const fillDemo = (demoEmail) => {
+    setEmail(demoEmail);
+    setPassword("password123");
+    onLogin(demoEmail, "password123");
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-dark-950 via-dark-900 to-dark-950 flex flex-col justify-center items-center p-4">
+      {/* Background ambient glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="w-full max-w-md space-y-6 relative z-10">
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 items-center justify-center shadow-xl shadow-brand-500/20 mb-1">
+            <i className="fa-solid fa-shield-halved text-white text-2xl"></i>
+          </div>
+          <h1 className="text-2xl font-black text-white tracking-tight">REC Guardian</h1>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            AI-Powered Renewable Energy Certificate Fraud Detection & Sovereign Forensic Intelligence Platform
+          </p>
+        </div>
+
+        {/* Portal Type Switcher */}
+        <div className="grid grid-cols-2 p-1 bg-dark-850 border border-slate-800 rounded-2xl shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              setPortalMode("USER");
+              setIsRegisterMode(false);
+            }}
+            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+              portalMode === "USER"
+                ? "bg-brand-600 text-white shadow"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <i className="fa-solid fa-solar-panel"></i>
+            <span>Generator / Trader</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPortalMode("REGULATOR");
+              setIsRegisterMode(false);
+            }}
+            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+              portalMode === "REGULATOR"
+                ? "bg-blue-600 text-white shadow"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <i className="fa-solid fa-scale-balanced"></i>
+            <span>Regulator / Auditor</span>
+          </button>
+        </div>
+
+        {/* Main Auth Card */}
+        <div className="bg-dark-850 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl">
+          <div className="border-b border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <i className={`fa-solid ${portalMode === "USER" ? "fa-bolt text-emerald-400" : "fa-shield-halved text-blue-400"}`}></i>
+              <span>{portalMode === "USER" ? "Clean Energy Generator Access" : "Regulatory Authority Access"}</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {portalMode === "USER"
+                ? "Submit generation claims, track smart meter logs, and manage verified green certificates."
+                : "Inspect fraud alerts, adjudicate open holds, and verify cryptographic SHA-256 ledger integrity."}
+            </p>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <span>{error}</span>
+            </div>
+          )}
+
+          {regError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <span>{regError}</span>
+            </div>
+          )}
+
+          {/* Quick Demo Logins Bar */}
+          <div className="space-y-2">
+            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              1-Click Demo Accounts ({portalMode === "USER" ? "Generators" : "Regulators"}):
+            </div>
+            <div className="space-y-1.5">
+              {DEMO_PORTALS[portalMode].map((u) => (
+                <button
+                  key={u.email}
+                  type="button"
+                  onClick={() => fillDemo(u.email)}
+                  className="w-full text-left p-2.5 rounded-xl bg-dark-900 hover:bg-slate-800 border border-slate-700/60 transition flex items-center justify-between group text-xs"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-6 h-6 rounded-lg bg-${u.color}-500/10 text-${u.color}-400 flex items-center justify-center text-[10px]`}>
+                      <i className={`fa-solid ${u.icon}`}></i>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-200 group-hover:text-white">{u.label}</div>
+                      <div className="text-[10px] text-slate-500">{u.email}</div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-brand-400 font-semibold group-hover:translate-x-0.5 transition">
+                    Login &rarr;
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-slate-800"></div>
+            <span className="flex-shrink mx-3 text-[11px] text-slate-500 uppercase font-mono">Or enter credentials</span>
+            <div className="flex-grow border-t border-slate-800"></div>
+          </div>
+
+          {/* Credentials Form */}
+          {!isRegisterMode ? (
+            <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={portalMode === "USER" ? "generator@solarfarm.com" : "regulator@recguardian.org"}
+                  className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2.5 text-slate-200 font-mono focus:border-brand-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <label className="text-slate-300 font-medium">Password</label>
+                  <span className="text-[10px] text-slate-500 font-mono">Demo: password123</span>
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2.5 text-slate-200 focus:border-brand-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full py-2.5 rounded-xl font-bold text-white transition shadow-lg flex items-center justify-center gap-2 ${
+                  portalMode === "USER"
+                    ? "bg-brand-600 hover:bg-brand-500 shadow-brand-600/20"
+                    : "bg-blue-600 hover:bg-blue-500 shadow-blue-600/20"
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <i className="fa-solid fa-spinner animate-spin"></i>
+                    <span>Authenticating JWT...</span>
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-lock text-xs"></i>
+                    <span>Authenticate & Access {portalMode === "USER" ? "Generator Portal" : "Regulator Portal"}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            // Register Mode (Generators only)
+            <form onSubmit={handleRegister} className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Contact Full Name</label>
+                <input
+                  type="text"
+                  value={regFullName}
+                  onChange={(e) => setRegFullName(e.target.value)}
+                  placeholder="e.g. Elena Ramos"
+                  className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2 text-slate-200"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Power Generation Organization</label>
+                <input
+                  type="text"
+                  value={regOrgName}
+                  onChange={(e) => setRegOrgName(e.target.value)}
+                  placeholder="e.g. Desert Sun Solar Farm Inc."
+                  className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2 text-slate-200"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Work Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="operator@desertsun.com"
+                  className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2 text-slate-200 font-mono"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2 text-slate-200"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-500 transition shadow"
+              >
+                Create Account & Sign In
+              </button>
+            </form>
+          )}
+
+          {portalMode === "USER" && (
+            <div className="text-center pt-1 border-t border-slate-800 text-[11px] text-slate-400">
+              {isRegisterMode ? (
+                <button onClick={() => setIsRegisterMode(false)} className="text-brand-400 hover:underline">
+                  Already registered? Back to Login
+                </button>
+              ) : (
+                <button onClick={() => setIsRegisterMode(true)} className="text-brand-400 hover:underline">
+                  New renewable plant operator? Register facility here &rarr;
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="text-center text-xs text-slate-500">
+          Cryptographically secured with JSON Web Tokens (PyJWT) & SHA-256 Ledger
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// TAB: DASHBOARD (TAILORED FOR REGULATOR VS GENERATOR)
+// -------------------------------------------------------------
+function DashboardTab({
+  stats,
+  recentClaims,
+  certificates,
+  onSelectClaim,
+  onNewClaim,
+  onOpenTransfer,
+  currentUser,
+  isRegulator,
+}) {
+  if (!stats) return <div className="text-center py-20 text-slate-400">Loading intelligence dashboard...</div>;
 
   return (
     <div className="space-y-6">
       {/* Banner */}
       <div className="bg-gradient-to-r from-dark-850 via-slate-900 to-dark-850 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Forensic Intelligence & Fraud Radar</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Real-time multi-layered verification: Smart Meter Telemetry vs Physical Laws vs Isolation Forest ML vs NetworkX Transfer Graph.
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+              isRegulator ? "bg-blue-500/10 text-blue-400 border border-blue-500/30" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+            }`}>
+              {isRegulator ? "REGULATORY SURVEILLANCE RADAR" : "ENERGY PRODUCER WORKSPACE"}
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+            {isRegulator ? "Macro Forensic Intelligence & Fraud Radar" : `${currentUser.organization_name || "Generator"} Portfolio`}
+          </h1>
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+            {isRegulator
+              ? "Multi-layered surveillance: Smart Meter Telemetry vs Theoretical Physics vs Isolation Forest ML vs NetworkX Transfer Loops."
+              : "Track metered clean generation, submit REC claims, and manage green attribute certificates on the cryptographic ledger."}
           </p>
         </div>
-        <div className="flex gap-2">
-          {currentUser?.role === "GENERATOR" && (
-            <button
-              onClick={onNewClaim}
-              className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-brand-600/20 flex items-center gap-2"
-            >
-              <i className="fa-solid fa-plus"></i>
-              <span>Submit Generation Claim</span>
-            </button>
-          )}
-        </div>
+
+        {!isRegulator && (
+          <button
+            onClick={onNewClaim}
+            className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-brand-600/20 flex items-center gap-2"
+          >
+            <i className="fa-solid fa-plus"></i>
+            <span>Submit Generation Claim</span>
+          </button>
+        )}
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-dark-850 border border-slate-800 p-5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Total MWh Verified</span>
+            <span>{isRegulator ? "Total Clean MWh Verified" : "My Minted Clean Energy"}</span>
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
               <i className="fa-solid fa-bolt text-xs"></i>
             </div>
@@ -369,19 +797,19 @@ function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentU
             {stats.total_mwh_issued.toLocaleString()} <span className="text-xs font-sans text-slate-400 font-normal">MWh</span>
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            From {stats.total_certificates_issued} minted RECs
+            {stats.total_certificates_issued} Verified RECs
           </div>
         </div>
 
         <div className="bg-dark-850 border border-slate-800 p-5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Fraud Radar Triggered</span>
+            <span>{isRegulator ? "Fraud Radar Alerts" : "Claims Under Review / Hold"}</span>
             <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
               <i className="fa-solid fa-triangle-exclamation text-xs"></i>
             </div>
           </div>
           <div className="text-2xl font-bold text-rose-400 mt-2 font-mono">
-            {stats.claims_held + stats.claims_under_review} <span className="text-xs font-sans text-slate-400 font-normal">Claims</span>
+            {stats.claims_held + stats.claims_under_review}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             {stats.claims_held} Held on Audit • {stats.claims_under_review} Needs Review
@@ -390,28 +818,28 @@ function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentU
 
         <div className="bg-dark-850 border border-slate-800 p-5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Active Forensic Cases</span>
+            <span>{isRegulator ? "Active Adjudication Cases" : "My Generation Plants"}</span>
             <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
-              <i className="fa-solid fa-gavel text-xs"></i>
+              <i className={`fa-solid ${isRegulator ? "fa-gavel" : "fa-industry"} text-xs`}></i>
             </div>
           </div>
           <div className="text-2xl font-bold text-amber-400 mt-2 font-mono">
-            {stats.open_investigation_cases}
+            {isRegulator ? stats.open_investigation_cases : stats.total_plants}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Human-in-the-loop regulatory review
+            {isRegulator ? "Awaiting regulator resolution" : "Solar, Wind & Hydro facilities"}
           </div>
         </div>
 
         <div className="bg-dark-850 border border-slate-800 p-5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Transfer Volume & Loops</span>
+            <span>{isRegulator ? "Market Transfer Events" : "Certificates in My Wallet"}</span>
             <div className="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
-              <i className="fa-solid fa-arrows-rotate text-xs"></i>
+              <i className={`fa-solid ${isRegulator ? "fa-arrows-rotate" : "fa-wallet"} text-xs`}></i>
             </div>
           </div>
           <div className="text-2xl font-bold text-white mt-2 font-mono">
-            {stats.total_certificates_transferred}
+            {isRegulator ? stats.total_certificates_transferred : certificates.length}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             {stats.total_certificates_redeemed} RECs retired / redeemed
@@ -419,19 +847,19 @@ function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentU
         </div>
       </div>
 
-      {/* Risk Distribution Breakdown */}
+      {/* Risk Distribution & Recent Claims */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-dark-850 border border-slate-800 p-5 rounded-2xl">
           <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <i className="fa-solid fa-chart-pie text-brand-400"></i>
-            <span>Forensic Risk Distribution</span>
+            <span>{isRegulator ? "Market Risk Distribution" : "My Portfolio Risk Distribution"}</span>
           </h2>
           <div className="space-y-3">
             {[
               { label: "Low Risk (Auto-Approved)", count: stats.risk_distribution.LOW, color: "bg-emerald-500", text: "text-emerald-400" },
               { label: "Medium Risk (Needs Review)", count: stats.risk_distribution.MEDIUM, color: "bg-amber-500", text: "text-amber-400" },
-              { label: "High Risk (Held)", count: stats.risk_distribution.HIGH, color: "bg-orange-500", text: "text-orange-400" },
-              { label: "Critical Risk (Fraud Trigger)", count: stats.risk_distribution.CRITICAL, color: "bg-rose-500", text: "text-rose-400" },
+              { label: "High Risk (Audit Hold)", count: stats.risk_distribution.HIGH, color: "bg-orange-500", text: "text-orange-400" },
+              { label: "Critical Risk (Fraud Detected)", count: stats.risk_distribution.CRITICAL, color: "bg-rose-500", text: "text-rose-400" },
             ].map((r) => {
               const total = stats.total_claims || 1;
               const pct = Math.round((r.count / total) * 100);
@@ -450,14 +878,14 @@ function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentU
           </div>
         </div>
 
-        {/* Recent Claims Table (2 Columns) */}
+        {/* Recent Claims Table */}
         <div className="lg:col-span-2 bg-dark-850 border border-slate-800 p-5 rounded-2xl">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <i className="fa-solid fa-list-check text-brand-400"></i>
-              <span>Recent Generation Claims & Risk Scores</span>
+              <span>{isRegulator ? "Recent Claims Across All Producers" : "My Recent Submissions"}</span>
             </h2>
-            <span className="text-xs text-slate-400">Click row for full AI explanation</span>
+            <span className="text-xs text-slate-400">Click row for AI explanation</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -466,7 +894,7 @@ function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentU
                 <tr>
                   <th className="pb-2">Claim ID</th>
                   <th className="pb-2">Claimed MWh</th>
-                  <th className="pb-2">Risk Score</th>
+                  <th className="pb-2">AI Risk Score</th>
                   <th className="pb-2">Status</th>
                   <th className="pb-2 text-right">Action</th>
                 </tr>
@@ -497,7 +925,7 @@ function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentU
                       </td>
                       <td className="py-2.5 text-right">
                         <button className="text-brand-400 hover:text-brand-300 text-xs">
-                          Inspect <i className="fa-solid fa-chevron-right text-[10px] ml-1"></i>
+                          Inspect AI &rarr;
                         </button>
                       </td>
                     </tr>
@@ -513,9 +941,194 @@ function DashboardTab({ stats, recentClaims, onSelectClaim, onNewClaim, currentU
 }
 
 // -------------------------------------------------------------
-// TAB 2: CLAIMS & FRAUD RADAR
+// TAB: CERTIFICATE WALLET (FOR GENERATORS / TRADERS)
 // -------------------------------------------------------------
-function ClaimsTab({ claims, onSelectClaim, onNewClaim, currentUser, onReload }) {
+function WalletTab({ certificates, onOpenTransfer, apiFetch, onReload }) {
+  const [redeemingId, setRedeemingId] = useState(null);
+
+  const handleRedeem = async (certId) => {
+    if (!confirm("Are you sure you want to redeem/retire this certificate? This permanently burns the green attribute to prevent double-counting.")) return;
+    try {
+      setRedeemingId(certId);
+      await apiFetch(`/certificates/${certId}/redeem`, { method: "POST" });
+      onReload();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRedeemingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold text-white">My Verified Certificate Wallet</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Verified Renewable Energy Certificates minted onto the sovereign cryptographic ledger.</p>
+        </div>
+        <button
+          onClick={onReload}
+          className="bg-dark-850 hover:bg-slate-800 text-slate-300 text-xs px-3 py-2 rounded-xl border border-slate-700"
+        >
+          <i className="fa-solid fa-rotate-right mr-1"></i> Refresh Wallet
+        </button>
+      </div>
+
+      {certificates.length === 0 ? (
+        <div className="bg-dark-850 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 space-y-2">
+          <i className="fa-solid fa-wallet text-3xl text-slate-600 mb-2"></i>
+          <p className="text-sm font-medium">No certificates in wallet.</p>
+          <p className="text-xs text-slate-500">Submit an approved clean generation claim to mint green certificates.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {certificates.map((cert) => {
+            const isRedeemed = cert.status === "REDEEMED";
+            return (
+              <div key={cert.id} className="bg-dark-850 border border-slate-800 p-5 rounded-2xl space-y-3 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-xs font-bold text-brand-400">{cert.certificate_uid}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      isRedeemed ? "bg-slate-800 text-slate-400 border-slate-700" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    }`}>
+                      {cert.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="text-2xl font-bold text-white font-mono">{cert.mwh.toLocaleString()} <span className="text-xs text-slate-400">MWh</span></div>
+                    <div className="text-xs text-slate-400 mt-0.5">{cert.fuel_type} • Vintage {cert.vintage_month}/{cert.vintage_year}</div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800/80 flex gap-2">
+                  {!isRedeemed && (
+                    <>
+                      <button
+                        onClick={() => onOpenTransfer(cert)}
+                        className="flex-1 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold py-2 rounded-xl transition flex items-center justify-center gap-1.5"
+                      >
+                        <i className="fa-solid fa-arrow-right-arrow-left text-[11px]"></i>
+                        <span>Transfer</span>
+                      </button>
+                      <button
+                        onClick={() => handleRedeem(cert.id)}
+                        disabled={redeemingId === cert.id}
+                        className="bg-dark-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-700 transition"
+                        title="Permanently retire certificate"
+                      >
+                        {redeemingId === cert.id ? "Retiring..." : "Redeem"}
+                      </button>
+                    </>
+                  )}
+                  {isRedeemed && (
+                    <div className="w-full text-center text-xs text-slate-500 py-1 italic">
+                      <i className="fa-solid fa-check-double mr-1 text-emerald-500"></i> Retired / Redeemed
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// MODAL: TRANSFER CERTIFICATE
+// -------------------------------------------------------------
+function TransferModal({ cert, onClose, apiFetch, onTransferred }) {
+  const [recipientId, setRecipientId] = useState("6");
+  const [notes, setNotes] = useState("Bilateral clean energy purchase agreement");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      await apiFetch(`/certificates/${cert.id}/transfer`, {
+        method: "POST",
+        body: JSON.stringify({
+          to_user_id: parseInt(recipientId),
+          notes,
+        }),
+      });
+      onTransferred();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-dark-850 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white">Transfer Certificate {cert.certificate_uid}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div className="bg-dark-900 p-3 rounded-xl border border-slate-800 font-mono text-slate-300">
+            <div>MWh Volume: <span className="text-white font-bold">{cert.mwh} MWh</span></div>
+            <div>Fuel Source: <span className="text-emerald-400">{cert.fuel_type}</span></div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-slate-300 font-medium">Select Recipient Counterparty</label>
+            <select
+              value={recipientId}
+              onChange={(e) => setRecipientId(e.target.value)}
+              className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2.5 text-slate-200"
+              required
+            >
+              <option value="6">Global Carbon & REC Exchange (trader@energytrade.com)</option>
+              <option value="4">Helios Solar Generation (generator@solarfarm.com)</option>
+              <option value="5">Boreas Wind Energy (generator2@windpower.com)</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-slate-300 font-medium">Contract / Transfer Reference</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full bg-dark-900 border border-slate-700 rounded-xl p-2 text-slate-200 font-sans"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-dark-900 hover:bg-slate-800 text-slate-400 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition"
+            >
+              {submitting ? "Signing & Hashing..." : "Execute Transfer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// TAB: CLAIMS & FRAUD RADAR
+// -------------------------------------------------------------
+function ClaimsTab({ claims, onSelectClaim, onNewClaim, currentUser, isRegulator, onReload }) {
   const [filter, setFilter] = useState("ALL");
 
   const filtered = claims.filter((c) => {
@@ -530,11 +1143,17 @@ function ClaimsTab({ claims, onSelectClaim, onNewClaim, currentUser, onReload })
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white">Generation Claims & Verification Radar</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Every claim undergoes real-time multi-agent fraud screening before certification.</p>
+          <h1 className="text-xl font-bold text-white">
+            {isRegulator ? "Global Market Claims & Forensic Radar" : "My Submitted Generation Claims"}
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {isRegulator
+              ? "Comprehensive multi-layered fraud detection running on all submitted claims."
+              : "Track the verification and risk evaluation status of your renewable generation claims."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          {currentUser?.role === "GENERATOR" && (
+          {!isRegulator && (
             <button
               onClick={onNewClaim}
               className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2"
@@ -638,7 +1257,7 @@ function ClaimsTab({ claims, onSelectClaim, onNewClaim, currentUser, onReload })
 }
 
 // -------------------------------------------------------------
-// TAB 3: INVESTIGATIONS (CASE MANAGEMENT)
+// TAB: INVESTIGATIONS (CASE MANAGEMENT)
 // -------------------------------------------------------------
 function InvestigationsTab({ investigations, apiFetch, onReload, currentUser }) {
   const [adjudicatingCase, setAdjudicatingCase] = useState(null);
@@ -795,7 +1414,7 @@ function InvestigationsTab({ investigations, apiFetch, onReload, currentUser }) 
 }
 
 // -------------------------------------------------------------
-// TAB 4: TRANSFER GRAPH (NETWORKX VISUALIZATION)
+// TAB: TRANSFER GRAPH (NETWORKX VISUALIZATION)
 // -------------------------------------------------------------
 function NetworkGraphTab({ graphData, onReload }) {
   const containerRef = useRef(null);
@@ -903,7 +1522,7 @@ function NetworkGraphTab({ graphData, onReload }) {
 }
 
 // -------------------------------------------------------------
-// TAB 5: SHA-256 TAMPER-EVIDENT LEDGER
+// TAB: SHA-256 TAMPER-EVIDENT LEDGER
 // -------------------------------------------------------------
 function LedgerTab({
   blocks,
@@ -914,6 +1533,7 @@ function LedgerTab({
   setDocVerifyResult,
   docVerifyLoading,
   setDocVerifyLoading,
+  isRegulator,
 }) {
   const [runningAudit, setRunningAudit] = useState(false);
 
@@ -956,14 +1576,16 @@ function LedgerTab({
             Every claim, evaluation, issuance, and transfer is cryptographically linked in an append-only hash chain.
           </p>
         </div>
-        <button
-          onClick={runFullAudit}
-          disabled={runningAudit}
-          className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-brand-600/20"
-        >
-          <i className="fa-solid fa-lock text-xs"></i>
-          <span>{runningAudit ? "Auditing Full Chain..." : "Run Cryptographic Audit"}</span>
-        </button>
+        {isRegulator && (
+          <button
+            onClick={runFullAudit}
+            disabled={runningAudit}
+            className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-brand-600/20"
+          >
+            <i className="fa-solid fa-lock text-xs"></i>
+            <span>{runningAudit ? "Auditing Full Chain..." : "Run Cryptographic Audit"}</span>
+          </button>
+        )}
       </div>
 
       {/* Audit Banner */}
@@ -1074,13 +1696,13 @@ function LedgerTab({
 }
 
 // -------------------------------------------------------------
-// TAB 6: PLANTS & METERS
+// TAB: PLANTS & METERS
 // -------------------------------------------------------------
-function PlantsTab({ plants, apiFetch, onReload }) {
+function PlantsTab({ plants, apiFetch, onReload, currentUser }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Registered Generation Facilities & Smart Meters</h1>
+        <h1 className="text-xl font-bold text-white">Registered Generation Facilities & Telemetry</h1>
         <p className="text-xs text-slate-400 mt-0.5">Physical plant specs, location coordinates, and smart meter telemetry logs.</p>
       </div>
 
@@ -1131,7 +1753,7 @@ function PlantsTab({ plants, apiFetch, onReload }) {
 // -------------------------------------------------------------
 // MODAL: EXPLAINABLE RISK BREAKDOWN
 // -------------------------------------------------------------
-function RiskBreakdownModal({ claim, onClose, apiFetch, onReload }) {
+function RiskBreakdownModal({ claim, onClose, apiFetch, onReload, isRegulator }) {
   const [breakdown, setBreakdown] = useState(claim.risk_breakdown || null);
   const [reEvaluating, setReEvaluating] = useState(false);
 
@@ -1234,14 +1856,16 @@ function RiskBreakdownModal({ claim, onClose, apiFetch, onReload }) {
 
         {/* Actions */}
         <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-          <button
-            onClick={reEvaluate}
-            disabled={reEvaluating}
-            className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 font-medium"
-          >
-            <i className="fa-solid fa-rotate mr-1"></i>
-            {reEvaluating ? "Running Scikit-learn + Rules..." : "Re-run Forensic Engines"}
-          </button>
+          {isRegulator ? (
+            <button
+              onClick={reEvaluate}
+              disabled={reEvaluating}
+              className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 font-medium"
+            >
+              <i className="fa-solid fa-rotate mr-1"></i>
+              {reEvaluating ? "Running Scikit-learn + Rules..." : "Re-run Forensic Engines"}
+            </button>
+          ) : <div></div>}
           <button
             onClick={onClose}
             className="px-4 py-2 bg-dark-900 hover:bg-slate-800 text-slate-300 text-xs rounded-xl border border-slate-800"

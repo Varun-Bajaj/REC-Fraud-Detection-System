@@ -17,14 +17,16 @@ from app.engines.risk_engine import RiskFusionEngine
 from app.engines.ledger_engine import LedgerEngine
 
 
-def seed_database():
+def seed_database(force_reseed: bool = False):
     """Populates the database with test accounts, power facilities, telemetry logs, and fraud scenarios."""
+    if force_reseed:
+        Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
         # Check if already seeded
-        if db.query(User).first():
+        if not force_reseed and db.query(User).first():
             print("Database already contains records. Skipping seed.")
             return
 

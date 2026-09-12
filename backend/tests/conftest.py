@@ -16,9 +16,9 @@ from app.seeds.seed_data import seed_database
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
     """Initializes schema and seeds baseline dataset before running tests."""
-    Base.metadata.create_all(bind=engine)
-    seed_database()
+    seed_database(force_reseed=True)
     yield
+    seed_database(force_reseed=True)
 
 
 @pytest.fixture(scope="module")

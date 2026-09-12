@@ -103,14 +103,38 @@ This automatically initializes the database, creates the Genesis block on the cr
 
 ---
 
-## 6. Running Automated Tests
+## 6. Authentication & Role-Based Portals
+
+The frontend and API support dedicated persona-based access control with Bearer JWT tokens:
+
+### A. Energy Generator & Trader Portal
+- **Login Credentials**: `generator@solarfarm.com` or `generator2@windpower.com` (pw: `password123`)
+- **Self-Registration**: Clean energy producers can register new accounts via the registration modal.
+- **Dedicated Capabilities**:
+  - Scoped portfolio overview (only shows the user's registered power facilities and claims).
+  - Generation claim submission modal linked to smart meter telemetry readings.
+  - Digital REC Wallet to inspect owned certificates, execute peer-to-peer transfers, and redeem RECs for Scope 2 compliance.
+
+### B. Regulatory & Forensic Authority Portal
+- **Login Credentials**: `regulator@recguardian.org` or `auditor@recguardian.org` (pw: `password123`)
+- **Dedicated Capabilities**:
+  - Macro Forensic Radar displaying market-wide anomaly rates and risk breakdown distributions.
+  - Human-in-the-loop Regulatory Adjudication (`CONFIRM_FRAUD_HOLD` vs `CLEAR_AND_ISSUE`).
+  - NetworkX circular wash-trading loop detection.
+  - SHA-256 Cryptographic Ledger integrity audit & document verification tool.
+
+---
+
+## 7. Running Automated Tests
 
 ```bash
-pytest backend/tests -v
+./venv/bin/pytest backend/tests -v
 ```
-All 16 test cases verify:
-- Deterministic Rule Engine violations (meter, capacity, duplicates, document reuse)
+All 18 automated test cases verify:
+- Deterministic Rule Engine violations (meter mismatch, capacity factor, duplicate fingerprints, document reuse)
 - ML Isolation Forest outlier detection
 - NetworkX circular transfer cycle detection
 - Cryptographic SHA-256 ledger integrity & tamper detection
-- End-to-end REST API workflows (auth, claims, certificates, investigations, analytics)
+- JWT authentication (`POST /auth/login`, `POST /auth/login-json`, `POST /auth/register`)
+- Strict RBAC authorization (generators blocked with HTTP 403 from regulatory adjudication)
+- End-to-end REST API workflows (claims lifecycle, certificate wallet mint/transfer/redeem, analytics)
