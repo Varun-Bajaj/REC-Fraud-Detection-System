@@ -39,6 +39,12 @@ function App() {
   const [transferringCert, setTransferringCert] = useState(null);
   const [docVerifyResult, setDocVerifyResult] = useState(null);
   const [docVerifyLoading, setDocVerifyLoading] = useState(false);
+  const [lineageSearchQuery, setLineageSearchQuery] = useState("CLM-2026-FRAUD-MTR");
+
+  const handleExploreItem = (identifier) => {
+    setLineageSearchQuery(identifier);
+    setActiveTab("lineage");
+  };
 
   // Helper fetch with JWT authorization header
   const apiFetch = async (endpoint, options = {}) => {
@@ -241,6 +247,7 @@ function App() {
             // REGULATOR / AUDITOR / ADMIN TABS
             [
               { id: "dashboard", label: "Macro Fraud Radar", icon: "fa-chart-pie" },
+              { id: "lineage", label: "Certificate Explorer & Timeline", icon: "fa-timeline" },
               { id: "investigations", label: "Regulatory Cases (Adjudicate)", icon: "fa-scale-balanced", badge: dashboardStats?.open_investigation_cases },
               { id: "claims", label: "Global Claims Audit", icon: "fa-clipboard-check", badge: claims.length },
               { id: "network", label: "Transfer Loops (NetworkX)", icon: "fa-circle-nodes" },
@@ -259,6 +266,7 @@ function App() {
             // USER / GENERATOR / TRADER TABS
             [
               { id: "dashboard", label: "Portfolio Overview", icon: "fa-chart-line" },
+              { id: "lineage", label: "Certificate Explorer & Timeline", icon: "fa-timeline" },
               { id: "claims", label: "My Submitted Claims", icon: "fa-file-signature", badge: claims.length },
               { id: "wallet", label: "Certificate Wallet (RECs)", icon: "fa-wallet", badge: certificates.length },
               { id: "plants", label: "My Power Plants & Telemetry", icon: "fa-solar-panel" },
@@ -361,6 +369,15 @@ function App() {
             apiFetch={apiFetch}
             onReload={loadData}
             currentUser={currentUser}
+          />
+        )}
+
+        {/* Tab: Certificate & Claim Lineage Explorer */}
+        {activeTab === "lineage" && (
+          <LineageExplorerTab
+            apiFetch={apiFetch}
+            initialQuery={lineageSearchQuery}
+            onSelectQuery={(q) => setLineageSearchQuery(q)}
           />
         )}
       </main>
@@ -2022,6 +2039,334 @@ function SubmitClaimModal({ onClose, apiFetch, onSubmitted }) {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// CERTIFICATE & CLAIM LINEAGE EXPLORER TAB (WITH EVIDENCE TIMELINE)
+// -------------------------------------------------------------
+function LineageExplorerTab({ apiFetch, initialQuery, onSelectQuery }) {
+  const [searchInput, setSearchInput] = useState(initialQuery || "CLM-2026-FRAUD-MTR");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchLineage = async (targetQuery) => {
+    const q = (targetQuery || searchInput).trim();
+    if (!q) return;
+    setSearchInput(q);
+    if (onSelectQuery) onSelectQuery(q);
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await apiFetch(`/certificates/lineage/${encodeURIComponent(q)}`);
+      setData(res);
+    } catch (err) {
+      setError(err.message || "Failed to trace lineage");
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (initialQuery) {
+      fetchLineage(initialQuery);
+    }
+  }, [initialQuery]);
+
+  const presets = [
+    { label: "Meter Overclaim (+216%)", query: "CLM-2026-FRAUD-MTR", dot: "bg-rose-500" },
+    { label: "Capacity Impossible (>240%)", query: "CLM-2026-FRAUD-CAP", dot: "bg-rose-500" },
+    { label: "Circular Wash Ring (3 Hops)", query: "REC-2026-WND-88319", dot: "bg-amber-500" },
+    { label: "Active Verified Solar REC", query: "REC-2026-SOL-09921", dot: "bg-emerald-500" },
+    { label: "Clean Generation Baseline", query: "CLM-2026-LEGIT-01", dot: "bg-emerald-500" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Search Header */}
+      <div className="bg-dark-850 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <i className="fa-solid fa-timeline text-emerald-400"></i>
+            <h3 className="text-base font-bold text-white">Certificate & Claim Lineage Deep-Dive</h3>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Trace complete 6-stage lifecycle provenance: Ground Truth Telemetry → Claim → AI Risk Score → Investigation Case → REC Token → Cryptographic Ledger
+          </p>
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            fetchLineage();
+          }}
+          className="flex gap-2"
+        >
+          <div className="relative flex-1">
+            <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Enter Certificate UID (REC-...), Claim UID (CLM-...), or Case #"
+              className="w-full bg-dark-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-slate-500"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+          >
+            {loading ? <i className="fa-solid fa-rotate animate-spin"></i> : <i className="fa-solid fa-magnifying-glass"></i>}
+            <span>Trace Lineage</span>
+          </button>
+        </form>
+
+        {/* Preset Chips */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Quick Presets:</span>
+          {presets.map((p, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => fetchLineage(p.query)}
+              className="px-2.5 py-1 bg-dark-900 border border-slate-700/60 hover:border-slate-500 rounded-lg text-slate-300 font-mono text-[11px] flex items-center gap-1.5 transition"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />
+              <span>{p.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading && (
+        <div className="text-center py-16 text-slate-400">
+          <i className="fa-solid fa-circle-notch animate-spin text-2xl text-blue-500 mb-2"></i>
+          <p className="text-xs">Traversing Cryptographic Hash Ledger & Forensic Archives...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-4 bg-rose-950/30 border border-rose-800 text-rose-300 text-xs rounded-xl">
+          {error}
+        </div>
+      )}
+
+      {data && data.found && (
+        <div className="space-y-6">
+          {/* Target Banner */}
+          <div className="p-4 bg-dark-850 border border-slate-800 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-slate-400">Target Identifier:</span>
+                <span className="font-mono font-bold text-sm text-white">{data.query}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                  {data.search_type}
+                </span>
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Facility: <span className="text-slate-200 font-medium">{data.plant?.name || "N/A"}</span> ({data.plant?.fuel_type || "N/A"} • {data.plant?.capacity_mw || 0} MW)
+              </div>
+            </div>
+
+            {data.claim && (
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <div className="text-[10px] font-mono text-slate-400 uppercase">AI Forensic Score</div>
+                  <div className={`text-xl font-mono font-bold ${
+                    data.claim.risk_score >= 65 ? "text-rose-400" : data.claim.risk_score >= 25 ? "text-amber-400" : "text-emerald-400"
+                  }`}>
+                    {data.claim.risk_score.toFixed(1)} / 100
+                  </div>
+                </div>
+                <span className={`px-3 py-1 rounded text-xs font-bold font-mono border ${
+                  data.claim.risk_score >= 65
+                    ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                    : data.claim.risk_score >= 25
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                }`}>
+                  {data.claim.status}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* The 6-Stage Lineage Pipeline Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Stage 1: Ground Truth */}
+            <div className="p-3.5 bg-dark-850 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">1. Ground Truth</span>
+              <div className="font-semibold text-white truncate">{data.plant?.name || "Power Facility"}</div>
+              <div className="text-[11px] text-slate-400">{data.plant?.capacity_mw} MW Capacity</div>
+              {data.meter && (
+                <div className="pt-1 text-[11px] font-mono text-emerald-400 border-t border-slate-800">
+                  Meter: {data.meter.energy_generated_mwh?.toLocaleString()} MWh
+                </div>
+              )}
+            </div>
+
+            {/* Stage 2: Claim */}
+            <div className="p-3.5 bg-dark-850 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">2. Claim Record</span>
+              <div className="font-mono text-white font-medium truncate">{data.claim?.uid || "N/A"}</div>
+              <div className="text-[11px] font-mono text-slate-300">{data.claim?.mwh?.toLocaleString()} MWh</div>
+              <div className="text-[10px] text-slate-500 font-mono truncate">FP: {data.claim?.fingerprint?.slice(0, 10)}...</div>
+            </div>
+
+            {/* Stage 3: AI Risk */}
+            <div className="p-3.5 bg-dark-850 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">3. AI Risk Score</span>
+              <div className={`font-bold font-mono text-sm ${
+                (data.claim?.risk_score || 0) >= 65 ? "text-rose-400" : "text-emerald-400"
+              }`}>
+                {data.claim?.risk_score?.toFixed(1) || "0.0"} / 100
+              </div>
+              <div className="text-[11px] text-slate-400">{data.claim?.risk_level || "LOW"} Risk</div>
+              <div className="text-[10px] text-slate-500 truncate">{data.risk_assessment?.recommendation || "APPROVED"}</div>
+            </div>
+
+            {/* Stage 4: Investigation */}
+            <div className="p-3.5 bg-dark-850 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">4. Investigation</span>
+              {data.investigation ? (
+                <>
+                  <div className="font-mono font-medium text-amber-400 truncate">{data.investigation.case_number}</div>
+                  <div className="text-[11px] text-slate-300">{data.investigation.priority} Priority</div>
+                  <div className="text-[10px] text-slate-400">{data.investigation.status}</div>
+                </>
+              ) : (
+                <div className="text-slate-500 text-[11px] italic">No Fraud Case Opened</div>
+              )}
+            </div>
+
+            {/* Stage 5: REC Certificate */}
+            <div className="p-3.5 bg-dark-850 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">5. REC Token</span>
+              {data.certificate ? (
+                <>
+                  <div className="font-mono font-medium text-emerald-400 truncate">{data.certificate.uid}</div>
+                  <div className="text-[11px] text-slate-300">{data.certificate.mwh?.toLocaleString()} MWh</div>
+                  <div className="text-[10px] text-slate-400">{data.certificate.status}</div>
+                </>
+              ) : (
+                <div className="text-slate-500 text-[11px] italic">Held (Not Minted)</div>
+              )}
+            </div>
+
+            {/* Stage 6: Ledger Block */}
+            <div className="p-3.5 bg-dark-850 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">6. Ledger Trust</span>
+              <div className="font-mono font-bold text-teal-400">
+                {data.ledger_blocks?.length > 0 ? `${data.ledger_blocks.length} Blocks` : "Pending"}
+              </div>
+              <div className="text-[10px] text-slate-500 font-mono truncate">
+                {data.ledger_blocks?.[0]?.current_hash ? `Hash: ${data.ledger_blocks[0].current_hash.slice(0, 8)}...` : "Genesis Verified"}
+              </div>
+            </div>
+          </div>
+
+          {/* Chronological Evidence Timeline */}
+          <div className="bg-dark-850 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <i className="fa-solid fa-clock-rotate-left text-emerald-400"></i>
+                  <span>Forensic Evidence Timeline</span>
+                </h4>
+                <p className="text-xs text-slate-400">Immutable chronological sequence of events, verifications, and regulatory actions</p>
+              </div>
+              <span className="text-xs font-mono text-slate-400">
+                {data.timeline?.length || 0} Chronological Events
+              </span>
+            </div>
+
+            <div className="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-800">
+              {data.timeline?.map((evt, idx) => {
+                const isCritical = evt.severity === "CRITICAL";
+                const isWarning = evt.severity === "WARNING";
+                const isSuccess = evt.severity === "SUCCESS";
+
+                const dotColor = isCritical
+                  ? "bg-rose-500 ring-4 ring-rose-950"
+                  : isWarning
+                  ? "bg-amber-500 ring-4 ring-amber-950"
+                  : isSuccess
+                  ? "bg-emerald-500 ring-4 ring-emerald-950"
+                  : "bg-blue-500 ring-4 ring-blue-950";
+
+                return (
+                  <div key={idx} className="relative flex items-start gap-4 pl-8">
+                    <div className={`absolute left-2.5 top-1.5 w-2.5 h-2.5 rounded-full ${dotColor}`} />
+                    <div className="flex-1 bg-dark-900 border border-slate-800/80 rounded-xl p-3.5 space-y-1">
+                      <div className="flex flex-wrap justify-between items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white">{evt.title}</span>
+                          <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                            isCritical ? "bg-rose-500/20 text-rose-300" : isWarning ? "bg-amber-500/20 text-amber-300" : isSuccess ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-800 text-slate-300"
+                          }`}>
+                            {evt.stage}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-400">
+                          {new Date(evt.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">{evt.description}</p>
+                      {evt.actor && (
+                        <div className="text-[10px] text-slate-500 font-mono pt-1">
+                          Responsible Actor: <span className="text-slate-400">{evt.actor}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Transfers Table (if any) */}
+          {data.transfers?.length > 0 && (
+            <div className="bg-dark-850 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <i className="fa-solid fa-arrow-right-arrow-left text-emerald-400"></i>
+                <span>Secondary Market Trading Hops</span>
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-800 text-slate-400 pb-2">
+                    <tr>
+                      <th className="py-2">From Party</th>
+                      <th className="py-2">To Party</th>
+                      <th className="py-2">Transfer Action</th>
+                      <th className="py-2 font-mono">Transaction Hash</th>
+                      <th className="py-2">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+                    {data.transfers.map((t, i) => (
+                      <tr key={i} className="hover:bg-slate-800/20">
+                        <td className="py-2.5 font-sans font-medium text-white">{t.from_user}</td>
+                        <td className="py-2.5 font-sans font-medium text-slate-300">{t.to_user}</td>
+                        <td className="py-2.5">
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">
+                            {t.transfer_type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-slate-400 text-[11px]">{t.tx_hash.slice(0, 16)}...</td>
+                        <td className="py-2.5 text-slate-500 text-[11px] font-sans">{new Date(t.timestamp).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

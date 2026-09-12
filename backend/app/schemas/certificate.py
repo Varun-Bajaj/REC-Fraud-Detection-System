@@ -41,3 +41,28 @@ class CertificateTransferResponse(BaseModel):
 class CertificateProvenanceResponse(BaseModel):
     certificate: CertificateResponse
     lifecycle_transfers: List[CertificateTransferResponse]
+
+
+class EvidenceTimelineItem(BaseModel):
+    timestamp: str
+    stage: str
+    title: str
+    description: str
+    severity: str = "INFO"  # SUCCESS, INFO, WARNING, CRITICAL
+    actor: Optional[str] = None
+    icon: Optional[str] = None
+
+
+class CertificateLineageResponse(BaseModel):
+    found: bool
+    query: str
+    search_type: str  # CERTIFICATE, CLAIM, CASE, NOT_FOUND
+    certificate: Optional[dict] = None
+    claim: Optional[dict] = None
+    plant: Optional[dict] = None
+    meter: Optional[dict] = None
+    risk_assessment: Optional[dict] = None
+    investigation: Optional[dict] = None
+    transfers: List[dict] = []
+    ledger_blocks: List[dict] = []
+    timeline: List[EvidenceTimelineItem] = []

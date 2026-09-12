@@ -179,6 +179,10 @@ export class ApiService {
     return this.request<Certificate[]>("/certificates/");
   }
 
+  static async getCertificateLineage(identifier: string): Promise<any> {
+    return this.request(`/certificates/lineage/${encodeURIComponent(identifier)}`);
+  }
+
   static async transferCertificate(certId: number, toUserId: number, notes?: string): Promise<any> {
     return this.request(`/certificates/${certId}/transfer`, {
       method: "POST",

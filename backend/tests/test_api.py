@@ -288,3 +288,38 @@ def test_investigation_and_regulatory_decision(client):
     decision_data = decision_res.json()
     assert decision_data["decision_action"] == "CONFIRM_FRAUD_HOLD"
     assert decision_data["status"] == "RESOLVED_FRAUD"
+
+
+def test_certificate_lineage_and_timeline(client):
+    """Test 6-stage lineage provenance tracing and evidence timeline generation."""
+    token = get_token(client, "auditor@recguardian.org")
+
+    # 1. Trace a fraud claim
+    res_claim = client.get(
+        "/api/v1/certificates/lineage/CLM-2026-FRAUD-MTR",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res_claim.status_code == 200
+    claim_lineage = res_claim.json()
+    assert claim_lineage["found"] is True
+    assert claim_lineage["search_type"] == "CLAIM"
+    assert claim_lineage["claim"]["uid"] == "CLM-2026-FRAUD-MTR"
+    assert len(claim_lineage["timeline"]) >= 3
+
+    # Verify timeline stage order and properties
+    timeline_stages = [item["stage"] for item in claim_lineage["timeline"]]
+    assert "GROUND_TRUTH" in timeline_stages
+    assert "SUBMISSION" in timeline_stages
+    assert "AI_DETECTION" in timeline_stages
+
+    # 2. Trace a secondary market trading cycle
+    res_cert = client.get(
+        "/api/v1/certificates/lineage/REC-2026-WND-88319",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res_cert.status_code == 200
+    cert_lineage = res_cert.json()
+    assert cert_lineage["found"] is True
+    assert cert_lineage["search_type"] == "CERTIFICATE"
+    assert len(cert_lineage["transfers"]) >= 3
+    assert len(cert_lineage["timeline"]) >= 4

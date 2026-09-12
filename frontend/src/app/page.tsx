@@ -37,27 +37,45 @@ import {
   Wind,
   Layers,
   Search,
+  Activity,
+  History,
+  Check,
+  ExternalLink,
+  Gavel,
+  ChevronRight,
+  Database,
+  Building,
+  Radio,
 } from "lucide-react";
 
-// Demo login profiles for testing
-const DEMO_PORTALS = {
+// Institutional Demo Personas for Quick Access
+const DEMO_PERSONAS = {
   USER: [
-    { label: "Solar Generator (Helios LLC)", email: "generator@solarfarm.com", role: "GENERATOR", org: "Helios Solar Generation LLC" },
-    { label: "Wind Generator (Boreas Ltd)", email: "generator2@windpower.com", role: "GENERATOR", org: "Boreas Wind Energy Ltd" },
-    { label: "Energy Trader (Global Carbon)", email: "trader@energytrade.com", role: "GENERATOR", org: "Global Carbon & REC Exchange" },
+    { label: "Solar Energy Producer", sub: "Helios Solar Generation LLC (50 MW)", email: "generator@solarfarm.com", role: "GENERATOR", org: "Helios Solar Generation LLC" },
+    { label: "Wind Energy Producer", sub: "Boreas Wind Energy Ltd (120 MW)", email: "generator2@windpower.com", role: "GENERATOR", org: "Boreas Wind Energy Ltd" },
+    { label: "Institutional Energy Trader", sub: "Global Carbon & REC Exchange", email: "trader@energytrade.com", role: "GENERATOR", org: "Global Carbon & REC Exchange" },
   ],
   REGULATOR: [
-    { label: "Regulatory Officer (RERC)", email: "regulator@recguardian.org", role: "REGULATOR", org: "Renewable Energy Regulatory Commission" },
-    { label: "Senior Forensic Auditor", email: "auditor@recguardian.org", role: "AUDITOR", org: "Apex Forensic ESG Audit Group" },
-    { label: "System Administrator", email: "admin@recguardian.org", role: "ADMIN", org: "REC Guardian Authority" },
+    { label: "Chief Regulatory Officer", sub: "Renewable Energy Regulatory Commission (RERC)", email: "regulator@recguardian.org", role: "REGULATOR", org: "Renewable Energy Regulatory Commission" },
+    { label: "Senior ESG Forensic Auditor", sub: "Apex Forensic ESG Audit Group", email: "auditor@recguardian.org", role: "AUDITOR", org: "Apex Forensic ESG Audit Group" },
+    { label: "Platform Administrator", sub: "REC Guardian Authority", email: "admin@recguardian.org", role: "ADMIN", org: "REC Guardian Authority" },
   ],
 };
 
+// Preset search queries for the Lineage Explorer
+const DEMO_LINEAGE_QUERIES = [
+  { label: "Meter Overclaim (+216%)", query: "CLM-2026-FRAUD-MTR", badge: "FRAUD" },
+  { label: "Capacity Impossibility (>240%)", query: "CLM-2026-FRAUD-CAP", badge: "FRAUD" },
+  { label: "Circular Wash Trading Loop", query: "REC-2026-WND-88319", badge: "LOOP" },
+  { label: "Verified Active Solar REC", query: "REC-2026-SOL-09921", badge: "VERIFIED" },
+  { label: "Clean Generation Baseline", query: "CLM-2026-LEGIT-01", badge: "CLEAN" },
+];
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
-  const [authPortal, setAuthPortal] = useState<"USER" | "REGULATOR">("USER");
+  const [authPortal, setAuthPortal] = useState<"USER" | "REGULATOR">("REGULATOR");
   const [authMode, setAuthMode] = useState<"LOGIN" | "REGISTER">("LOGIN");
-  const [loginEmail, setLoginEmail] = useState("generator@solarfarm.com");
+  const [loginEmail, setLoginEmail] = useState("regulator@recguardian.org");
   const [loginPassword, setLoginPassword] = useState("password123");
   const [regFullName, setRegFullName] = useState("");
   const [regEmail, setRegEmail] = useState("");
@@ -76,6 +94,12 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Lineage Explorer State
+  const [lineageSearchInput, setLineageSearchInput] = useState("CLM-2026-FRAUD-MTR");
+  const [lineageData, setLineageData] = useState<any>(null);
+  const [lineageLoading, setLineageLoading] = useState(false);
+  const [lineageError, setLineageError] = useState<string | null>(null);
 
   // Modals & selections
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
@@ -190,7 +214,6 @@ export default function Home() {
         organization_name: regOrg,
         role: "GENERATOR",
       });
-      // Auto-login after registration
       const loginRes = await ApiService.loginJson(regEmail, regPassword);
       setUser(loginRes.user);
       await loadDashboardData(loginRes.user);
@@ -209,7 +232,32 @@ export default function Home() {
     setCertificates([]);
     setCases([]);
     setLedgerAudit(null);
+    setLineageData(null);
     setActiveTab("dashboard");
+  };
+
+  // Lineage Fetcher
+  const handleFetchLineage = async (queryToSearch?: string) => {
+    const q = (queryToSearch || lineageSearchInput).trim();
+    if (!q) return;
+    setLineageSearchInput(q);
+    setLineageLoading(true);
+    setLineageError(null);
+    try {
+      const result = await ApiService.getCertificateLineage(q);
+      setLineageData(result);
+    } catch (err: any) {
+      setLineageError(err.message || "Failed to trace lineage for identifier");
+      setLineageData(null);
+    } finally {
+      setLineageLoading(false);
+    }
+  };
+
+  const handleExploreItem = (identifier: string) => {
+    setLineageSearchInput(identifier);
+    setActiveTab("lineage");
+    handleFetchLineage(identifier);
   };
 
   const handleSubmitClaim = async (e: React.FormEvent) => {
@@ -275,107 +323,107 @@ export default function Home() {
     }
   };
 
-  // ----------------------------------------------------
-  // Unauthenticated State: Auth Gateway (User vs Regulator)
-  // ----------------------------------------------------
+  // ----------------------------------------------------------------------
+  // AUTHENTICATION GATEWAY: INSTITUTIONAL REGULATORY & GENERATOR PORTAL
+  // ----------------------------------------------------------------------
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden">
-        {/* Background glow effects */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="w-full max-w-xl z-10 space-y-6">
-          {/* Logo & Header */}
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
+        <div className="w-full max-w-xl space-y-6">
+          {/* Official Agency Brand Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 shadow-xl shadow-emerald-500/20 mb-2">
-              <ShieldCheck className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 text-emerald-400 mb-1 shadow-md">
+              <ShieldCheck className="w-7 h-7" />
             </div>
-            <h1 className="text-2xl font-black text-white tracking-tight">REC Guardian</h1>
-            <p className="text-sm text-slate-400">
-              National Renewable Energy Certificate Fraud Detection & Verification Engine
-            </p>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
+                National Clean Energy Regulatory Infrastructure
+              </span>
+              <h1 className="text-2xl font-bold text-white tracking-tight">REC Guardian</h1>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                Renewable Energy Certificate Multi-Engine Fraud Detection, Telemetry Verification & Tamper-Evident Ledger
+              </p>
+            </div>
           </div>
 
-          {/* Portal Switcher */}
-          <div className="bg-slate-900/90 border border-slate-800 p-1.5 rounded-2xl grid grid-cols-2 gap-1 text-xs font-semibold backdrop-blur">
-            <button
-              onClick={() => {
-                setAuthPortal("USER");
-                setLoginEmail("generator@solarfarm.com");
-                setAuthError(null);
-              }}
-              className={`py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${
-                authPortal === "USER"
-                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Sun className="w-4 h-4" />
-              <span>Energy Generator & Trader</span>
-            </button>
+          {/* Institutional Portal Switcher */}
+          <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl grid grid-cols-2 gap-1 text-xs font-semibold">
             <button
               onClick={() => {
                 setAuthPortal("REGULATOR");
                 setLoginEmail("regulator@recguardian.org");
                 setAuthError(null);
               }}
-              className={`py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${
+              className={`py-2.5 rounded-lg transition flex items-center justify-center gap-2 ${
                 authPortal === "REGULATOR"
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                  ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
               }`}
             >
               <Scale className="w-4 h-4" />
               <span>Regulatory Authority</span>
             </button>
+            <button
+              onClick={() => {
+                setAuthPortal("USER");
+                setLoginEmail("generator@solarfarm.com");
+                setAuthError(null);
+              }}
+              className={`py-2.5 rounded-lg transition flex items-center justify-center gap-2 ${
+                authPortal === "USER"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Sun className="w-4 h-4" />
+              <span>Clean Energy Producer</span>
+            </button>
           </div>
 
-          {/* Portal Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur">
-            <div className="mb-5 flex justify-between items-center border-b border-slate-800/80 pb-4">
+          {/* Authentication Container */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div className="mb-5 flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
-                <h2 className="text-lg font-bold text-white">
-                  {authPortal === "USER" ? "Generator & Trader Access" : "Forensic Regulatory Portal"}
+                <h2 className="text-base font-bold text-white">
+                  {authPortal === "REGULATOR" ? "Forensic & Regulatory Authority Portal" : "Clean Energy Producer Workspace"}
                 </h2>
                 <p className="text-xs text-slate-400">
-                  {authPortal === "USER"
-                    ? "Manage clean energy facilities, submit claims, and transfer verified RECs"
-                    : "Macro forensic radar, rule engines, cycle analysis, and judicial holding"}
+                  {authPortal === "REGULATOR"
+                    ? "Macro surveillance, human-in-the-loop adjudication, and ledger audit"
+                    : "Facility management, smart meter claims, and verified certificate wallet"}
                 </p>
               </div>
-              <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
-                authPortal === "USER" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : "bg-blue-500/10 text-blue-400 border border-blue-500/30"
+              <span className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase ${
+                authPortal === "REGULATOR" ? "bg-blue-500/10 text-blue-400 border border-blue-500/30" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
               }`}>
-                {authPortal === "USER" ? "RBAC: Generator" : "RBAC: Regulator"}
+                {authPortal === "REGULATOR" ? "RBAC: Authority" : "RBAC: Producer"}
               </span>
             </div>
 
-            {/* Error Message */}
             {authError && (
-              <div className="mb-4 p-3 bg-rose-950/40 border border-rose-800 text-rose-300 text-xs rounded-xl flex items-center gap-2">
+              <div className="mb-4 p-3 bg-rose-950/30 border border-rose-800 text-rose-300 text-xs rounded-xl flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 <span>{authError}</span>
               </div>
             )}
 
-            {/* 1-Click Demo Profiles */}
+            {/* 1-Click Institutional Demo Personas */}
             <div className="mb-5">
-              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                Quick 1-Click Demo Accounts
-              </label>
-              <div className="grid grid-cols-1 gap-2">
-                {DEMO_PORTALS[authPortal].map((p, idx) => (
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-2 font-bold">
+                1-Click Verified Demo Credentials
+              </span>
+              <div className="space-y-1.5">
+                {DEMO_PERSONAS[authPortal].map((p, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => handleDemoLogin(p.email)}
                     disabled={actionLoading}
-                    className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/50 hover:bg-slate-800 hover:border-slate-700 transition text-left text-xs"
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/80 hover:border-slate-700 transition text-left text-xs"
                   >
                     <div>
                       <div className="font-semibold text-white">{p.label}</div>
-                      <div className="text-[11px] text-slate-400">{p.email}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{p.sub}</div>
                     </div>
                     <span className="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-300 font-mono">
                       Log In →
@@ -385,44 +433,41 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Divider */}
             <div className="relative flex py-2 items-center">
               <div className="flex-grow border-t border-slate-800"></div>
-              <span className="flex-shrink mx-4 text-[11px] text-slate-500 uppercase tracking-widest font-bold">Or Email & Password</span>
+              <span className="flex-shrink mx-4 text-[10px] text-slate-500 uppercase font-mono font-bold">Or System Password</span>
               <div className="flex-grow border-t border-slate-800"></div>
             </div>
 
             {authMode === "LOGIN" ? (
-              <form onSubmit={handleLogin} className="space-y-4 mt-3">
+              <form onSubmit={handleLogin} className="space-y-3 mt-3">
                 <div>
-                  <label className="block text-xs text-slate-300 mb-1">Email Address</label>
+                  <label className="block text-xs text-slate-300 mb-1">Institutional Email</label>
                   <input
                     type="email"
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    placeholder="user@example.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-300 mb-1">Password</label>
+                  <label className="block text-xs text-slate-300 mb-1">Passcode</label>
                   <input
                     type="password"
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-600"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={actionLoading}
                   className={`w-full py-2.5 rounded-xl text-xs font-bold text-white transition flex items-center justify-center gap-2 ${
-                    authPortal === "USER"
-                      ? "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30"
-                      : "bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/30"
+                    authPortal === "REGULATOR"
+                      ? "bg-blue-600 hover:bg-blue-500"
+                      : "bg-emerald-600 hover:bg-emerald-500"
                   }`}
                 >
                   {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
@@ -436,7 +481,7 @@ export default function Home() {
                       onClick={() => setAuthMode("REGISTER")}
                       className="text-xs text-emerald-400 hover:underline"
                     >
-                      New Clean Energy Generator? Register Organization
+                      New Clean Power Asset? Register Facility Account
                     </button>
                   </div>
                 )}
@@ -444,36 +489,36 @@ export default function Home() {
             ) : (
               <form onSubmit={handleRegister} className="space-y-3 mt-3">
                 <div>
-                  <label className="block text-xs text-slate-300 mb-1">Full Name</label>
+                  <label className="block text-xs text-slate-300 mb-1">Authorized Representative</label>
                   <input
                     type="text"
                     required
                     value={regFullName}
                     onChange={(e) => setRegFullName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    placeholder="John Doe"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="Dr. Samantha Vance"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-300 mb-1">Organization / Generator Name</label>
+                  <label className="block text-xs text-slate-300 mb-1">Energy Producer Organization</label>
                   <input
                     type="text"
                     required
                     value={regOrg}
                     onChange={(e) => setRegOrg(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    placeholder="Evergreen Wind Energy Ltd"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="Apex Clean Energy Generation LLC"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-300 mb-1">Work Email</label>
+                  <label className="block text-xs text-slate-300 mb-1">Official Work Email</label>
                   <input
                     type="email"
                     required
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    placeholder="john@evergreen.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="svance@apexenergy.com"
                   />
                 </div>
                 <div>
@@ -483,17 +528,16 @@ export default function Home() {
                     required
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition flex items-center justify-center gap-2"
                 >
                   {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                  <span>Register Energy Producer Account</span>
+                  <span>Register Energy Asset Account</span>
                 </button>
                 <div className="text-center pt-2">
                   <button
@@ -501,7 +545,7 @@ export default function Home() {
                     onClick={() => setAuthMode("LOGIN")}
                     className="text-xs text-slate-400 hover:text-white"
                   >
-                    Already registered? Back to Sign In
+                    Back to Sign In
                   </button>
                 </div>
               </form>
@@ -512,38 +556,38 @@ export default function Home() {
     );
   }
 
-  // ----------------------------------------------------
-  // Authenticated State: Role-Separated Dashboard
-  // ----------------------------------------------------
+  // ----------------------------------------------------------------------
+  // AUTHENTICATED DASHBOARD (ROLE-SEPARATED & LINEAGE EXPLORER)
+  // ----------------------------------------------------------------------
   const isRegulator = user.role === "REGULATOR" || user.role === "AUDITOR" || user.role === "ADMIN";
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans">
-      {/* Navigation Header */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+      {/* Top Institutional App Bar */}
+      <header className="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
-              isRegulator ? "bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-blue-500/20" : "bg-gradient-to-tr from-emerald-600 to-teal-400 shadow-emerald-500/20"
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white ${
+              isRegulator ? "bg-blue-600" : "bg-emerald-600"
             }`}>
-              {isRegulator ? <Scale className="w-5 h-5 text-white" /> : <ShieldCheck className="w-5 h-5 text-white" />}
+              {isRegulator ? <Scale className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-base text-white">REC Guardian</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${
+                <span className="font-bold text-sm text-white">REC Guardian</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${
                   isRegulator
                     ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
                     : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                 }`}>
-                  {isRegulator ? "Regulatory Intelligence Portal" : "Generator Workspace"}
+                  {isRegulator ? "REGULATORY SURVEILLANCE" : "PRODUCER WORKSPACE"}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-mono">{user.organization_name || user.email}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
               <div className="text-xs font-semibold text-white">{user.full_name}</div>
               <div className={`text-[10px] font-mono font-bold ${isRegulator ? "text-blue-400" : "text-emerald-400"}`}>
@@ -553,31 +597,34 @@ export default function Home() {
 
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold"
-              title="Logout session"
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold"
             >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden md:inline">Sign Out</span>
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
 
-        {/* Tab Bar - Separated by Role */}
+        {/* Tab Navigation */}
         <div className="max-w-7xl mx-auto px-4 flex gap-1 border-t border-slate-800 text-xs overflow-x-auto">
           {isRegulator ? (
             <>
               {[
                 { id: "dashboard", label: "Fraud Radar (Macro)" },
-                { id: "cases", label: `Investigation Cases (${cases.filter(c => c.status === "OPEN").length})` },
+                { id: "lineage", label: "Certificate Explorer & Timeline" },
+                { id: "cases", label: `Regulatory Cases (${cases.filter(c => c.status === "OPEN").length})` },
                 { id: "claims", label: "All Claims & AI Audit" },
                 { id: "ledger", label: "Cryptographic Ledger" },
               ].map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setActiveTab(t.id)}
+                  onClick={() => {
+                    setActiveTab(t.id);
+                    if (t.id === "lineage" && !lineageData) handleFetchLineage("CLM-2026-FRAUD-MTR");
+                  }}
                   className={`py-3 px-4 font-medium border-b-2 transition whitespace-nowrap ${
                     activeTab === t.id
-                      ? "border-blue-500 text-blue-400"
+                      ? "border-blue-500 text-blue-400 font-semibold"
                       : "border-transparent text-slate-400 hover:text-white"
                   }`}
                 >
@@ -589,16 +636,20 @@ export default function Home() {
             <>
               {[
                 { id: "dashboard", label: "Generation Overview" },
+                { id: "lineage", label: "Certificate Explorer & Timeline" },
                 { id: "claims", label: `My Claims (${claims.length})` },
                 { id: "certificates", label: `REC Wallet (${certificates.length})` },
                 { id: "plants", label: `Power Facilities (${plants.length})` },
               ].map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setActiveTab(t.id)}
+                  onClick={() => {
+                    setActiveTab(t.id);
+                    if (t.id === "lineage" && !lineageData) handleFetchLineage("CLM-2026-LEGIT-01");
+                  }}
                   className={`py-3 px-4 font-medium border-b-2 transition whitespace-nowrap ${
                     activeTab === t.id
-                      ? "border-emerald-500 text-emerald-400"
+                      ? "border-emerald-500 text-emerald-400 font-semibold"
                       : "border-transparent text-slate-400 hover:text-white"
                   }`}
                 >
@@ -610,24 +661,24 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+      {/* Main Workspace Body */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {loading ? (
           <div className="text-center py-24 text-slate-400">
-            <RotateCw className="w-8 h-8 animate-spin mx-auto text-emerald-500 mb-3" />
-            <p className="text-xs">Synchronizing with Forensic Backend & Cryptographic Ledger...</p>
+            <RotateCw className="w-7 h-7 animate-spin mx-auto text-slate-500 mb-2" />
+            <p className="text-xs">Synchronizing Forensic Registry Data...</p>
           </div>
         ) : (
           <>
-            {/* Top Stat Banner */}
+            {/* KPI Top Summary Cards */}
             {stats && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                   <div className="flex justify-between items-center text-xs text-slate-400">
                     <span>{isRegulator ? "Market Verified Generation" : "Total MWh Issued"}</span>
                     <Zap className={`w-4 h-4 ${isRegulator ? "text-blue-400" : "text-emerald-400"}`} />
                   </div>
-                  <div className="text-2xl font-bold font-mono text-white mt-2">
+                  <div className="text-2xl font-bold font-mono text-white mt-1.5">
                     {stats.total_mwh_issued.toLocaleString()} <span className="text-xs font-sans text-slate-400">MWh</span>
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">
@@ -635,12 +686,12 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                   <div className="flex justify-between items-center text-xs text-slate-400">
                     <span>{isRegulator ? "Macro Fraud Alerts" : "Claims Requiring Review"}</span>
                     <ShieldAlert className="w-4 h-4 text-rose-400" />
                   </div>
-                  <div className="text-2xl font-bold font-mono text-rose-400 mt-2">
+                  <div className="text-2xl font-bold font-mono text-rose-400 mt-1.5">
                     {stats.claims_held + stats.claims_under_review}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">
@@ -648,12 +699,12 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                   <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span>{isRegulator ? "Open Forensic Cases" : "Claim Acceptance Rate"}</span>
+                    <span>{isRegulator ? "Active Cases" : "Claim Approval Rate"}</span>
                     <Scale className="w-4 h-4 text-amber-400" />
                   </div>
-                  <div className="text-2xl font-bold font-mono text-amber-400 mt-2">
+                  <div className="text-2xl font-bold font-mono text-amber-400 mt-1.5">
                     {isRegulator ? stats.open_investigation_cases : `${stats.total_claims > 0 ? Math.round((stats.claims_approved / stats.total_claims) * 100) : 100}%`}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">
@@ -661,24 +712,313 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                   <div className="flex justify-between items-center text-xs text-slate-400">
                     <span>{isRegulator ? "Cryptographic Ledger" : "Active Power Facilities"}</span>
                     <Link2 className="w-4 h-4 text-teal-400" />
                   </div>
-                  <div className="text-2xl font-bold font-mono text-emerald-400 mt-2">
+                  <div className="text-2xl font-bold font-mono text-emerald-400 mt-1.5">
                     {isRegulator ? (ledgerAudit?.is_valid ? "100% Valid" : "Tamper Detected") : plants.length}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">
-                    {isRegulator ? `${ledgerAudit?.total_blocks || 0} SHA-256 Immutability Blocks` : "Registered clean assets"}
+                    {isRegulator ? `${ledgerAudit?.total_blocks || 0} SHA-256 Blocks` : "Registered Clean Assets"}
                   </div>
                 </div>
               </div>
             )}
 
+            {/* TAB: CERTIFICATE & CLAIM LINEAGE EXPLORER (The Core Feature) */}
+            {activeTab === "lineage" && (
+              <div className="space-y-6">
+                {/* Search Bar & Preset Queries */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <Search className="w-4 h-4 text-emerald-400" />
+                      <span>Certificate & Claim Lineage Deep-Dive</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Trace complete 6-stage lifecycle provenance: Ground Truth Telemetry → Claim → AI Risk Score → Investigation Case → REC Token → Cryptographic Ledger
+                    </p>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleFetchLineage();
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={lineageSearchInput}
+                      onChange={(e) => setLineageSearchInput(e.target.value)}
+                      placeholder="Enter Certificate UID (REC-...), Claim UID (CLM-...), or Case #"
+                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-slate-600"
+                    />
+                    <button
+                      type="submit"
+                      disabled={lineageLoading}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+                    >
+                      {lineageLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      <span>Trace Lineage</span>
+                    </button>
+                  </form>
+
+                  {/* Preset Search Chips */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Quick Presets:</span>
+                    {DEMO_LINEAGE_QUERIES.map((q, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleFetchLineage(q.query)}
+                        className="px-2.5 py-1 bg-slate-950 border border-slate-800 hover:border-slate-600 rounded-lg text-slate-300 font-mono text-[11px] flex items-center gap-1.5 transition"
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          q.badge === "FRAUD" ? "bg-rose-500" : q.badge === "LOOP" ? "bg-amber-500" : "bg-emerald-500"
+                        }`} />
+                        <span>{q.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Lineage Search Results */}
+                {lineageLoading && (
+                  <div className="text-center py-16 text-slate-400">
+                    <RotateCw className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
+                    <p className="text-xs">Traversing SHA-256 Ledger & Forensic Lineage...</p>
+                  </div>
+                )}
+
+                {lineageError && (
+                  <div className="p-4 bg-rose-950/30 border border-rose-800 text-rose-300 text-xs rounded-xl">
+                    {lineageError}
+                  </div>
+                )}
+
+                {lineageData && lineageData.found && (
+                  <div className="space-y-6">
+                    {/* Lineage Summary Banner */}
+                    <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-slate-400">Target Identifier:</span>
+                          <span className="font-mono font-bold text-sm text-white">{lineageData.query}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                            {lineageData.search_type}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          Facility: {lineageData.plant?.name || "Unassigned"} ({lineageData.plant?.fuel_type || "N/A"} • {lineageData.plant?.capacity_mw || 0} MW)
+                        </div>
+                      </div>
+
+                      {lineageData.claim && (
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-[10px] font-mono text-slate-400 uppercase">AI Forensic Score</div>
+                            <div className={`text-xl font-mono font-bold ${
+                              lineageData.claim.risk_score >= 65 ? "text-rose-400" : lineageData.claim.risk_score >= 25 ? "text-amber-400" : "text-emerald-400"
+                            }`}>
+                              {lineageData.claim.risk_score.toFixed(1)} / 100
+                            </div>
+                          </div>
+                          <span className={`px-3 py-1 rounded text-xs font-bold font-mono border ${
+                            lineageData.claim.risk_score >= 65
+                              ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                              : lineageData.claim.risk_score >= 25
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          }`}>
+                            {lineageData.claim.status}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* The 6-Stage Lineage Architecture Pipeline */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {/* Stage 1: Ground Truth */}
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">1. Ground Truth</span>
+                        <div className="font-semibold text-white">{lineageData.plant?.name || "Power Facility"}</div>
+                        <div className="text-[11px] text-slate-400">{lineageData.plant?.capacity_mw} MW Capacity</div>
+                        {lineageData.meter && (
+                          <div className="pt-1 text-[11px] font-mono text-emerald-400 border-t border-slate-800/80">
+                            Meter: {lineageData.meter.energy_generated_mwh?.toLocaleString()} MWh
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stage 2: Claim */}
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">2. Claim Record</span>
+                        <div className="font-mono text-white font-medium">{lineageData.claim?.uid || "N/A"}</div>
+                        <div className="text-[11px] font-mono text-slate-300">{lineageData.claim?.mwh?.toLocaleString()} MWh Claimed</div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate">FP: {lineageData.claim?.fingerprint?.slice(0, 10)}...</div>
+                      </div>
+
+                      {/* Stage 3: AI Risk */}
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">3. AI Risk Score</span>
+                        <div className={`font-bold font-mono text-sm ${
+                          (lineageData.claim?.risk_score || 0) >= 65 ? "text-rose-400" : "text-emerald-400"
+                        }`}>
+                          {lineageData.claim?.risk_score?.toFixed(1) || "0.0"} / 100
+                        </div>
+                        <div className="text-[11px] text-slate-400">{lineageData.claim?.risk_level || "LOW"} Risk</div>
+                        <div className="text-[10px] text-slate-500 truncate">
+                          {lineageData.risk_assessment?.recommendation || "APPROVED"}
+                        </div>
+                      </div>
+
+                      {/* Stage 4: Investigation */}
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">4. Investigation</span>
+                        {lineageData.investigation ? (
+                          <>
+                            <div className="font-mono font-medium text-amber-400">{lineageData.investigation.case_number}</div>
+                            <div className="text-[11px] text-slate-300">{lineageData.investigation.priority} Priority</div>
+                            <div className="text-[10px] text-slate-400">{lineageData.investigation.status}</div>
+                          </>
+                        ) : (
+                          <div className="text-slate-500 text-[11px] italic">No Fraud Case Opened</div>
+                        )}
+                      </div>
+
+                      {/* Stage 5: REC Certificate */}
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">5. REC Token</span>
+                        {lineageData.certificate ? (
+                          <>
+                            <div className="font-mono font-medium text-emerald-400 truncate">{lineageData.certificate.uid}</div>
+                            <div className="text-[11px] text-slate-300">{lineageData.certificate.mwh?.toLocaleString()} MWh</div>
+                            <div className="text-[10px] text-slate-400">{lineageData.certificate.status}</div>
+                          </>
+                        ) : (
+                          <div className="text-slate-500 text-[11px] italic">Held (Not Minted)</div>
+                        )}
+                      </div>
+
+                      {/* Stage 6: Ledger Block */}
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">6. Ledger Trust</span>
+                        <div className="font-mono font-bold text-teal-400">
+                          {lineageData.ledger_blocks?.length > 0 ? `${lineageData.ledger_blocks.length} Blocks` : "Pending"}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate">
+                          {lineageData.ledger_blocks?.[0]?.current_hash ? `Hash: ${lineageData.ledger_blocks[0].current_hash.slice(0, 8)}...` : "Genesis Verified"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Chronological Evidence Timeline */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                      <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <div>
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                            <History className="w-4 h-4 text-emerald-400" />
+                            <span>Forensic Evidence Timeline</span>
+                          </h4>
+                          <p className="text-xs text-slate-400">Immutable chronological sequence of events, verifications, and regulatory actions</p>
+                        </div>
+                        <span className="text-xs font-mono text-slate-400">
+                          {lineageData.timeline?.length || 0} Chronological Events
+                        </span>
+                      </div>
+
+                      <div className="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-800">
+                        {lineageData.timeline?.map((evt: any, idx: number) => {
+                          const isCritical = evt.severity === "CRITICAL";
+                          const isWarning = evt.severity === "WARNING";
+                          const isSuccess = evt.severity === "SUCCESS";
+
+                          const dotColor = isCritical
+                            ? "bg-rose-500 ring-4 ring-rose-950"
+                            : isWarning
+                            ? "bg-amber-500 ring-4 ring-amber-950"
+                            : isSuccess
+                            ? "bg-emerald-500 ring-4 ring-emerald-950"
+                            : "bg-blue-500 ring-4 ring-blue-950";
+
+                          return (
+                            <div key={idx} className="relative flex items-start gap-4 pl-8">
+                              <div className={`absolute left-2.5 top-1.5 w-2.5 h-2.5 rounded-full ${dotColor}`} />
+                              <div className="flex-1 bg-slate-950 border border-slate-800/80 rounded-xl p-3.5 space-y-1">
+                                <div className="flex flex-wrap justify-between items-center gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-white">{evt.title}</span>
+                                    <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                                      isCritical ? "bg-rose-500/20 text-rose-300" : isWarning ? "bg-amber-500/20 text-amber-300" : isSuccess ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-800 text-slate-300"
+                                    }`}>
+                                      {evt.stage}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] font-mono text-slate-400">
+                                    {new Date(evt.timestamp).toLocaleString()}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-slate-300 leading-relaxed">{evt.description}</p>
+                                {evt.actor && (
+                                  <div className="text-[10px] text-slate-500 font-mono pt-1">
+                                    Responsible Actor: <span className="text-slate-400">{evt.actor}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Transfers (if any) */}
+                    {lineageData.transfers?.length > 0 && (
+                      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+                          <span>Secondary Market Trading Hops</span>
+                        </h4>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="border-b border-slate-800 text-slate-400 pb-2">
+                              <tr>
+                                <th className="py-2">From Party</th>
+                                <th className="py-2">To Party</th>
+                                <th className="py-2">Transfer Action</th>
+                                <th className="py-2 font-mono">Transaction Hash</th>
+                                <th className="py-2">Timestamp</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+                              {lineageData.transfers.map((t: any, i: number) => (
+                                <tr key={i} className="hover:bg-slate-800/20">
+                                  <td className="py-2.5 font-sans font-medium text-white">{t.from_user}</td>
+                                  <td className="py-2.5 font-sans font-medium text-slate-300">{t.to_user}</td>
+                                  <td className="py-2.5">
+                                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">
+                                      {t.transfer_type}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 text-slate-400 text-[11px]">{t.tx_hash.slice(0, 16)}...</td>
+                                  <td className="py-2.5 text-slate-500 text-[11px] font-sans">{new Date(t.timestamp).toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* TAB: GENERATOR / TRADER - CLAIMS */}
             {!isRegulator && activeTab === "claims" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-base font-bold text-white">My Submitted Energy Generation Claims</h3>
@@ -686,7 +1026,7 @@ export default function Home() {
                   </div>
                   <button
                     onClick={() => setShowClaimModal(true)}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Submit New Claim</span>
@@ -702,7 +1042,7 @@ export default function Home() {
                         <th className="py-3">Period</th>
                         <th className="py-3">Risk Assessment</th>
                         <th className="py-3">Status</th>
-                        <th className="py-3 text-right">Details</th>
+                        <th className="py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
@@ -738,12 +1078,12 @@ export default function Home() {
                                 {c.status}
                               </span>
                             </td>
-                            <td className="py-3 text-right">
+                            <td className="py-3 text-right space-x-2">
                               <button
-                                onClick={() => setSelectedClaim(c)}
-                                className="text-emerald-400 hover:text-emerald-300 font-semibold text-[11px] underline"
+                                onClick={() => handleExploreItem(c.claim_uid)}
+                                className="text-blue-400 hover:text-blue-300 font-semibold text-[11px]"
                               >
-                                View Forensic
+                                Trace Lineage →
                               </button>
                             </td>
                           </tr>
@@ -757,7 +1097,7 @@ export default function Home() {
 
             {/* TAB: GENERATOR / TRADER - CERTIFICATES WALLET */}
             {!isRegulator && activeTab === "certificates" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -786,7 +1126,7 @@ export default function Home() {
                     {certificates.map((cert) => (
                       <div
                         key={cert.id}
-                        className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3 relative overflow-hidden group hover:border-emerald-500/50 transition"
+                        className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 hover:border-slate-700 transition"
                       >
                         <div className="flex justify-between items-start">
                           <div>
@@ -806,7 +1146,7 @@ export default function Home() {
                           </span>
                         </div>
 
-                        <div className="border-t border-slate-800/80 pt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div className="border-t border-slate-800/80 pt-2.5 grid grid-cols-2 gap-2 text-xs">
                           <div>
                             <div className="text-slate-500 text-[10px]">Volume</div>
                             <div className="font-mono font-bold text-white">{cert.mwh.toLocaleString()} MWh</div>
@@ -817,23 +1157,32 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {cert.status === "ISSUED" && (
-                          <div className="pt-2 flex gap-2">
-                            <button
-                              onClick={() => setTransferringCert(cert)}
-                              className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition"
-                            >
-                              <ArrowRightLeft className="w-3.5 h-3.5" />
-                              <span>Transfer</span>
-                            </button>
-                            <button
-                              onClick={() => handleRedeemCert(cert.id)}
-                              className="py-1.5 px-3 bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 border border-purple-700/50 rounded-xl text-xs font-semibold transition"
-                            >
-                              Redeem
-                            </button>
-                          </div>
-                        )}
+                        <div className="pt-2 flex gap-2">
+                          <button
+                            onClick={() => handleExploreItem(cert.certificate_uid)}
+                            className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition"
+                          >
+                            <Search className="w-3 h-3" />
+                            <span>Lineage</span>
+                          </button>
+                          {cert.status === "ISSUED" && (
+                            <>
+                              <button
+                                onClick={() => setTransferringCert(cert)}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                <ArrowRightLeft className="w-3 h-3" />
+                                <span>Transfer</span>
+                              </button>
+                              <button
+                                onClick={() => handleRedeemCert(cert.id)}
+                                className="px-3 py-1.5 bg-purple-900/30 hover:bg-purple-800/50 text-purple-300 border border-purple-700/40 rounded-lg text-xs font-semibold transition"
+                              >
+                                Redeem
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -843,7 +1192,7 @@ export default function Home() {
 
             {/* TAB: GENERATOR / TRADER - POWER PLANTS */}
             {!isRegulator && activeTab === "plants" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
                     <Factory className="w-5 h-5 text-emerald-400" />
@@ -854,7 +1203,7 @@ export default function Home() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {plants.map((p) => (
-                    <div key={p.id} className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <div key={p.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5">
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="font-bold text-white text-sm">{p.name}</h4>
@@ -864,18 +1213,14 @@ export default function Home() {
                           {p.status}
                         </span>
                       </div>
-                      <div className="border-t border-slate-800/80 pt-3 space-y-1 text-xs text-slate-400">
+                      <div className="border-t border-slate-800/80 pt-2.5 space-y-1 text-xs text-slate-400">
                         <div className="flex justify-between">
                           <span>Interconnect Code:</span>
                           <span className="font-mono text-slate-200">{p.grid_interconnection_id}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Max Theoretical Capacity Factor:</span>
+                          <span>Theoretical Max Capacity Factor:</span>
                           <span className="font-mono text-slate-200">{(p.max_capacity_factor * 100).toFixed(0)}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Location:</span>
-                          <span className="text-slate-300">{p.location_address || "Mojave Desert, CA"}</span>
                         </div>
                       </div>
                     </div>
@@ -886,17 +1231,17 @@ export default function Home() {
 
             {/* TAB: REGULATOR - INVESTIGATION CASES */}
             {isRegulator && activeTab === "cases" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
                       <Scale className="w-5 h-5 text-blue-400" />
-                      <span>Regulatory Adjudication Cases</span>
+                      <span>Regulatory Investigation Cases</span>
                     </h3>
                     <p className="text-xs text-slate-400">Claims flagged for potential double counting, capacity fraud, or meter mismatches</p>
                   </div>
                   <span className="text-xs font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-full">
-                    {cases.filter(c => c.status === "OPEN").length} Pending Cases
+                    {cases.filter(c => c.status === "OPEN").length} Pending Review
                   </span>
                 </div>
 
@@ -911,7 +1256,7 @@ export default function Home() {
                               ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
                               : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
                           }`}>
-                            {cs.priority} PRIORITY
+                            {cs.priority}
                           </span>
                           <span className="text-slate-400 text-xs">| Claim #{cs.claim_id}</span>
                         </div>
@@ -924,21 +1269,23 @@ export default function Home() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {cs.status === "OPEN" ? (
+                        <button
+                          onClick={() => handleExploreItem(cs.case_number)}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition"
+                        >
+                          View Dossier →
+                        </button>
+                        {cs.status === "OPEN" && (
                           <button
                             onClick={() => {
                               setSelectedCase(cs);
                               setAdjudicateAction("CONFIRM_FRAUD_HOLD");
                               setAdjudicateNotes(cs.findings || "");
                             }}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow transition"
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow transition"
                           >
                             Adjudicate Case
                           </button>
-                        ) : (
-                          <span className="text-xs text-slate-500 font-mono bg-slate-800/60 px-3 py-1 rounded-lg">
-                            Resolved
-                          </span>
                         )}
                       </div>
                     </div>
@@ -950,7 +1297,7 @@ export default function Home() {
             {/* TAB: REGULATOR - LEDGER AUDIT */}
             {isRegulator && activeTab === "ledger" && (
               <div className="space-y-6">
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
                   <div className="flex justify-between items-center mb-4">
                     <div>
                       <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -961,22 +1308,20 @@ export default function Home() {
                         Zero-tampering hash-linked chain securing claim submissions, mints, and transfers
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${
-                        ledgerAudit?.is_valid
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                          : "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                      }`}>
-                        {ledgerAudit?.is_valid ? "✓ SHA-256 CHAIN 100% VALID" : "✗ TAMPER DETECTED"}
-                      </span>
-                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${
+                      ledgerAudit?.is_valid
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                    }`}>
+                      {ledgerAudit?.is_valid ? "✓ SHA-256 CHAIN 100% VALID" : "✗ TAMPER DETECTED"}
+                    </span>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {ledgerBlocks.map((blk) => (
                       <div
                         key={blk.id}
-                        className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-xl font-mono text-xs space-y-1.5"
+                        className="p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-xs space-y-1"
                       >
                         <div className="flex justify-between items-center">
                           <span className="text-teal-400 font-bold">BLOCK #{blk.index} • {blk.event_type}</span>
@@ -986,10 +1331,7 @@ export default function Home() {
                           Entity: {blk.entity_type} ({blk.entity_id})
                         </div>
                         <div className="text-[10px] text-slate-500 break-all">
-                          <span className="text-slate-400">Current Hash:</span> {blk.current_hash}
-                        </div>
-                        <div className="text-[10px] text-slate-500 break-all">
-                          <span className="text-slate-400">Prev Hash:</span> {blk.previous_hash}
+                          <span className="text-slate-400">Hash:</span> {blk.current_hash}
                         </div>
                       </div>
                     ))}
@@ -998,20 +1340,20 @@ export default function Home() {
               </div>
             )}
 
-            {/* TAB: DEFAULT (CLAIMS LISTING & AI RISK RADAR) */}
+            {/* TAB: DEFAULT (CLAIMS AUDIT & AI FRAUD RADAR) */}
             {(activeTab === "dashboard" || (isRegulator && activeTab === "claims")) && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-5">
-                <div className="flex justify-between items-center mb-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-5 space-y-4">
+                <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-2">
                       <FileSearch className={`w-5 h-5 ${isRegulator ? "text-blue-400" : "text-emerald-400"}`} />
-                      <span>{isRegulator ? "Forensic Claims Audit & Multi-Engine Risk Scores" : "Recent Generation Claims"}</span>
+                      <span>{isRegulator ? "Claims Forensic Surveillance & AI Scores" : "Recent Generation Claims"}</span>
                     </h3>
                     <p className="text-xs text-slate-400">
                       Cross-referenced against smart meter telemetry, grid interconnection capacity, and ML anomaly models
                     </p>
                   </div>
-                  <span className="text-xs text-slate-400">Click any row for complete forensic evidence</span>
+                  <span className="text-xs text-slate-400">Click any row to trace complete lineage</span>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1023,6 +1365,7 @@ export default function Home() {
                         <th className="py-2.5">AI Risk Score</th>
                         <th className="py-2.5">Engine Recommendation</th>
                         <th className="py-2.5">Status</th>
+                        <th className="py-2.5 text-right">Lineage</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
@@ -1038,8 +1381,7 @@ export default function Home() {
                         return (
                           <tr
                             key={c.id}
-                            onClick={() => setSelectedClaim(c)}
-                            className="hover:bg-slate-800/40 cursor-pointer transition"
+                            className="hover:bg-slate-800/40 transition"
                           >
                             <td className="py-3 font-mono font-medium text-white">{c.claim_uid}</td>
                             <td className="py-3 font-mono text-slate-300">{c.claimed_mwh.toLocaleString()} MWh</td>
@@ -1055,6 +1397,14 @@ export default function Home() {
                               <span className="text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded text-[11px]">
                                 {c.status}
                               </span>
+                            </td>
+                            <td className="py-3 text-right">
+                              <button
+                                onClick={() => handleExploreItem(c.claim_uid)}
+                                className="text-blue-400 hover:text-blue-300 font-semibold text-[11px]"
+                              >
+                                Trace Lineage →
+                              </button>
                             </td>
                           </tr>
                         );
@@ -1132,7 +1482,7 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1">Smart Meter Reading Reference ID</label>
+                <label className="block text-slate-300 mb-1">Smart Meter Telemetry Reference ID</label>
                 <input
                   type="number"
                   value={newClaimMeterId}
@@ -1307,74 +1657,6 @@ export default function Home() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: FORENSIC RISK BREAKDOWN */}
-      {selectedClaim && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-2xl p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <div>
-                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest font-bold">
-                  AI Forensic Risk Assessment
-                </span>
-                <h3 className="text-lg font-bold text-white">{selectedClaim.claim_uid}</h3>
-              </div>
-              <button onClick={() => setSelectedClaim(null)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-800 bg-slate-950 flex justify-between items-center">
-              <div>
-                <div className="text-xs font-bold text-slate-300">
-                  Decision: {selectedClaim.risk_breakdown?.recommendation || (selectedClaim.risk_score >= 65 ? "HOLD" : "APPROVE")}
-                </div>
-                <div className="text-xs text-slate-400 mt-1 max-w-sm">
-                  {selectedClaim.risk_breakdown?.summary_explanation || "Forensic rule evaluation complete."}
-                </div>
-              </div>
-              <div className="text-right font-mono">
-                <div className="text-3xl font-black text-white">{selectedClaim.risk_score.toFixed(1)}</div>
-                <div className="text-[10px] uppercase font-bold text-slate-400">Score / 100</div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-slate-300">Triggered Rules & Evidence:</div>
-              <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
-                {selectedClaim.risk_breakdown?.factors?.map((f, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-xl border text-xs ${
-                      f.flagged
-                        ? "bg-rose-950/30 border-rose-800/60 text-rose-200"
-                        : "bg-slate-950/40 border-slate-800 text-slate-400"
-                    }`}
-                  >
-                    <div className="flex justify-between font-bold">
-                      <span>[{f.rule_id}] {f.name}</span>
-                      <span className={f.flagged ? "text-rose-400" : "text-slate-500"}>{f.severity}</span>
-                    </div>
-                    <p className="mt-1 text-[11px] leading-relaxed">{f.description}</p>
-                    {f.evidence_details && Object.keys(f.evidence_details).length > 0 && (
-                      <pre className="mt-2 p-2 bg-black/40 rounded-lg text-[10px] font-mono overflow-x-auto text-slate-300">
-                        {JSON.stringify(f.evidence_details, null, 2)}
-                      </pre>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setSelectedClaim(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-xl"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}
