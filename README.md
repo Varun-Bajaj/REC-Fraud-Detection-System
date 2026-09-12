@@ -1,59 +1,133 @@
 # REC Guardian
 ### AI-Powered Renewable Energy Certificate Fraud Detection & Forensic Intelligence Platform
 
-**Team**: KHATRON KE KHILADI  
-**Role Breakdown**:
-- **Varun**: Backend & AI/ML Engineer
-- **Kevin**: Blockchain & Security Engineer
-- **Dhruv**: Frontend & Product Engineer
+> **Hackathon Team**: KHATRON KE KHILADI  
+> **Core Focus**: Preventing duplicate claims, meter overclaiming, physical capacity violations, document evidence reuse, and circular wash trading across Renewable Energy Certificate (REC) markets.
+
+---
+
+## 📚 Technical Documentation Index
+
+For in-depth specifications, forensic guides, and API contracts, explore the documentation suite:
+
+| Document | Link | Summary |
+| :--- | :--- | :--- |
+| 🏛️ **System Architecture** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 6-layer architecture, mathematical formulations, Isolation Forest feature vectors, risk fusion ensemble, ledger specifications. |
+| 🔌 **REST API Reference** | [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Complete OpenAPI/REST documentation across all 8 modules with request/response schemas, Bearer JWT auth, and curl examples. |
+| 🚨 **Fraud Scenarios Guide** | [`docs/FRAUD_SCENARIOS_GUIDE.md`](docs/FRAUD_SCENARIOS_GUIDE.md) | Forensic analysis and investigation walkthrough for the 5 seeded fraud scenarios (`CLM-2026-LEGIT-01`, `CLM-2026-FRAUD-MTR`, etc.). |
+| 🎨 **Frontend & UX Guide** | [`docs/FRONTEND_GUIDE.md`](docs/FRONTEND_GUIDE.md) | Institutional GovTech design system, color palette rationale, dual frontend implementations, Lineage Explorer, and Vis.js network surveillance. |
 
 ---
 
 ## 1. Problem & Core Mission
-A Renewable Energy Certificate (REC) represents a claim: *"this much renewable electricity was generated."* That claim passes through many hands — generator, meter, issuer, trader, buyer — before it is finally redeemed. At every handoff, fraud risks occur:
-1. **Meter vs. Claim Mismatch**: Generators claiming more energy than the meter recorded.
-2. **Duplicate Claims**: Resubmission of identical generation records or overlapping intervals.
-3. **Physical Capacity Violations**: Generation claims that exceed physical plant capacity or theoretical laws.
-4. **Document Reuse**: Evidence files (meter reports, single line diagrams) recycled across unrelated claims.
-5. **Wash Trading Rings**: Suspicious circular transfers between accounts to artificially inflate volumes.
 
-**REC Guardian** acts as a sovereign forensic intelligence layer:
+A **Renewable Energy Certificate (REC)** represents legal property rights to the environmental attributes of 1 Megawatt-hour (MWh) of renewable electricity.
+
+Because electricity injected into the grid is physically indistinguishable, market integrity depends entirely on the accounting and registry layer. In legacy registries, critical vulnerabilities persist:
+
+```
+[ Power Plant ] ──> [ Generation Claim ] ──> [ Registry Issuance ] ──> [ Secondary Market Trading ] ──> [ Retirement / Scope 2 Claim ]
+                           │                            │                               │
+                     ⚠️ Risk 1:                   ⚠️ Risk 2:                      ⚠️ Risk 3:
+               Meter vs. Claim Mismatch       Capacity Impossibility           Circular Wash-Trading
+               (Over-issuance Fraud)          & Document Reuse                 & Phantom Transactions
+```
+
+1. **Meter vs. Claim Mismatches**: Generators claim significantly more generation than calibrated grid meters recorded (e.g., claiming 3,800 MWh on a 1,200 MWh meter reading — $+216.7\%$ overclaim).
+2. **Physical Capacity Violations**: Claiming generation volumes that mathematically exceed nameplate capacity $\times$ interval hours $\times$ maximum theoretical capacity factors.
+3. **Evidence Document Reuse**: Re-submitting identical single-line diagrams, utility interconnection approvals, or meter CSV reports across unrelated facilities or time intervals.
+4. **Duplicate Submission Fingerprinting**: Resubmitting identical or overlapping generation periods to harvest multiple certificates for the same megawatt-hour.
+5. **Circular Wash Trading**: Market counterparties rapidly passing certificates in closed loops ($A \to B \to C \to A$) to artificially inflate trading volumes or launder fraudulent certificates.
+
+**REC Guardian** replaces fragmented, manual auditing with a sovereign forensic intelligence pipeline:
 $$\text{Detect} \longrightarrow \text{Explain} \longrightarrow \text{Investigate} \longrightarrow \text{Preserve Evidence}$$
 
 ---
 
-## 2. Key Architecture & Forensic Engines
+## 2. 6-Layer Architecture Pipeline
 
-### Detection Layers:
+```
+                     ┌─────────────────────────────────────────────────────────┐
+                     │                     1. DATA SOURCES                     │
+                     │  Ground Truth IoT Telemetry • Claims • Certificates     │
+                     └────────────────────────────┬────────────────────────────┘
+                                                  │
+                                                  ▼
+                     ┌─────────────────────────────────────────────────────────┐
+                     │               2. DATA PRE-VALIDATION ENGINE             │
+                     │  Physical Sanity • Interval Checks • Telemetry Alignment│
+                     └────────────────────────────┬────────────────────────────┘
+                                                  │
+                                                  ▼
+                     ┌─────────────────────────────────────────────────────────┐
+                     │                3. HYBRID FRAUD DETECTION                │
+                     │  ┌───────────────────────┐   ┌────────────────────────┐ │
+                     │  │ Deterministic Rules   │   │ ML Isolation Forest    │ │
+                     │  │ (Physics, DUPs, Hashes)│  │ (Outlier Distributions)│ │
+                     │  └───────────┬───────────┘   └───────────┬────────────┘ │
+                     └──────────────┼───────────────────────────┼──────────────┘
+                                    │                           │
+                                    └─────────────┬─────────────┘
+                                                  │
+                                                  ▼
+                     ┌─────────────────────────────────────────────────────────┐
+                     │               4. MULTI-ENGINE RISK FUSION               │
+                     │    Weighted Ensemble • Hard Override • Explainability   │
+                     └────────────────────────────┬────────────────────────────┘
+                                                  │
+                                                  ▼
+                     ┌─────────────────────────────────────────────────────────┐
+                     │          5. INVESTIGATION & ADJUDICATION ENGINE         │
+                     │   Case Dockets • Evidence Timeline • Judicial Holding   │
+                     └────────────────────────────┬────────────────────────────┘
+                                                  │
+                                                  ▼
+                     ┌─────────────────────────────────────────────────────────┐
+                     │               6. CRYPTOGRAPHIC TRUST LEDGER             │
+                     │  SHA-256 Hash Chain • Immutability Audit • Block Trail  │
+                     └─────────────────────────────────────────────────────────┘
+```
+
+### Core Engine Responsibilities:
 1. **Deterministic Rule Engine** (`backend/app/engines/rule_engine.py`):
-   - Meter vs claim tolerance checks ($\Delta > 2\%$)
-   - Theoretical plant capacity factor ceilings
-   - Exact duplicate payload fingerprinting (SHA-256)
-   - Cross-facility evidence file hash collision detection
+   - Strict physical tolerance checks: $\Delta = \frac{|E_{\text{claim}} - E_{\text{meter}}|}{E_{\text{meter}}} > 2.0\%$ triggers `RULE-005` with CRITICAL severity.
+   - Theoretical plant capacity factor ceilings: $E_{\text{claim}} > C_{\text{MW}} \times \Delta t \times CF_{\text{baseline}}$ triggers `RULE-003` / `RULE-004`.
+   - Exact duplicate payload fingerprinting (SHA-256).
+   - Cross-facility evidence file hash collision detection (`RULE-009`).
 2. **ML Anomaly Engine** (`backend/app/engines/ml_engine.py`):
-   - Scikit-learn **Isolation Forest** multi-dimensional outlier detection
-   - Profiles capacity factor, meter ratio, and generation density against calibrated fuel baselines
+   - Scikit-learn **Isolation Forest** multi-dimensional outlier detection.
+   - Evaluates normalized feature vectors $\vec{X} = [\text{Capacity Factor}, \text{Meter Ratio}, \text{Generation Density}]$ against fuel-specific baseline distributions.
 3. **Graph Relationship Engine** (`backend/app/engines/graph_engine.py`):
-   - **NetworkX** directed transfer graph analysis
-   - Cycle detection algorithms to catch circular wash trading ($A \to B \to C \to A$)
-   - Counterparty clustering and reciprocity scoring
+   - **NetworkX** directed transfer graph analysis.
+   - Johnson's elementary cycle detection algorithm to identify circular wash trading loops ($A \to B \to C \to A$).
+   - Counterparty clustering and reciprocity scoring.
 4. **Risk Fusion & Decision Engine** (`backend/app/engines/risk_engine.py`):
-   - Weighted ensemble ($w_{\text{rules}} = 0.45, w_{\text{ml}} = 0.30, w_{\text{graph}} = 0.25$) with critical fraud override
-   - Explainable breakdown: provides human-readable reasons, score contributions, and evidence
-   - Actionable recommendations: `APPROVE`, `NEEDS_REVIEW`, or `HOLD`
-5. **Tamper-Evident SHA-256 Ledger** (`backend/app/engines/ledger_engine.py`):
-   - Append-only hash chain linking Genesis block to every certificate lifecycle event
-   - Cryptographic integrity audit API detects any retroactively modified data
+   - Weighted ensemble formula:
+     $$R_{\text{composite}} = 0.45 \cdot R_{\text{rules}} + 0.30 \cdot R_{\text{ml}} + 0.25 \cdot R_{\text{graph}}$$
+   - **Hard Override**: Any critical rule violation (e.g. meter mismatch $> 2\%$, duplicate hash, capacity impossibility) enforces $R \ge 85.0$ and status `HELD`.
+   - Actionable recommendations: `APPROVE`, `NEEDS_REVIEW`, or `HOLD`.
+5. **Investigation & Adjudication Engine** (`backend/app/engines/` & `backend/app/api/v1/investigations.py`):
+   - Automated case docket creation (`CASE-YYYY-XXX-NNN`) when a claim is held.
+   - **6-Stage Lineage Provenance** & **Chronological Evidence Timeline** generator.
+   - Human-in-the-loop regulatory adjudication (`CONFIRM_FRAUD_HOLD` vs `CLEAR_AND_ISSUE`).
+6. **Tamper-Evident SHA-256 Ledger** (`backend/app/engines/ledger_engine.py`):
+   - Append-only hash chain linking Genesis block to every certificate lifecycle event:
+     $$H_i = \text{SHA256}(i \parallel t_i \parallel \text{event\_type} \parallel \text{data\_hash} \parallel H_{i-1})$$
+   - Cryptographic integrity audit API detects any retroactively modified records.
 
 ---
 
 ## 3. Quick Start Guide
 
 ### Prerequisites
-- Python 3.10+ (Tested on Python 3.14)
+- Python 3.10+ (Tested and verified on Python 3.14)
 
-### 1. Environment Setup
+### 1. Setup Virtual Environment
 ```bash
+# Clone the repository
+git clone https://github.com/Varun-Bajaj/REC-Fraud-Detection-System.git
+cd REC-Fraud-Detection-System
+
 # Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
@@ -66,75 +140,121 @@ pip install -r backend/requirements.txt
 ```bash
 python backend/run.py
 ```
-This automatically initializes the database, creates the Genesis block on the cryptographic ledger, seeds realistic demo accounts & test scenarios, and launches the FastAPI server.
+This automatically initializes the SQLite/PostgreSQL database, seeds realistic demo accounts & test scenarios, anchors the Genesis block on the cryptographic ledger, and launches the FastAPI server.
 
+### 3. Open the Interactive Dashboards
 - **Interactive Forensic Dashboard UI**: [http://127.0.0.1:8000/](http://127.0.0.1:8000/) or [http://127.0.0.1:8000/app](http://127.0.0.1:8000/app)
-- **Interactive Swagger Docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **ReDoc UI**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **Interactive Swagger OpenAPI Docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **Interactive ReDoc UI**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 - **Health Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
-### 3. Frontend Architecture (Next.js & Embedded SPA)
-- **Zero-Dependency Embedded App**: Built with React 18, Tailwind CSS, Lucide icons, and Vis.js Network. Served directly by FastAPI with zero Node.js friction.
-- **Standalone Next.js Codebase** (`frontend/`): Complete TypeScript + Tailwind CSS production app with typed API clients and components for frontend engineers.
-
+> **Note on Frontend Solutions**:
+> - **Embedded Zero-Node SPA (`backend/app/static/`)**: Zero setup friction. Runs immediately in any browser with React 18, Tailwind CSS, Lucide icons, and Vis.js Network.
+> - **Standalone Next.js App (`frontend/`)**: Production Next.js 14 App Router codebase with full TypeScript typings and typed API clients. To run: `cd frontend && npm install && npm run dev` (starts on port 3000).
 
 ---
 
-## 4. Seed Accounts & Credentials
+## 4. Demo Seed Accounts & Credentials
 
-| Role | Email | Password | Organization |
-| :--- | :--- | :--- | :--- |
-| **Administrator** | `admin@recguardian.org` | `password123` | REC Guardian Authority |
-| **Regulator** | `regulator@recguardian.org` | `password123` | Renewable Energy Regulatory Commission |
-| **Auditor** | `auditor@recguardian.org` | `password123` | Apex Forensic ESG Audit Group |
-| **Generator (Solar)** | `generator@solarfarm.com` | `password123` | Helios Solar Generation LLC |
-| **Generator (Wind)** | `generator2@windpower.com` | `password123` | Boreas Wind Energy Ltd |
-| **Trader** | `trader@energytrade.com` | `password123` | Global Carbon & REC Exchange |
+The platform includes seeded accounts across all major market personas:
+
+| Role | Email | Password | Organization | Portal Experience |
+| :--- | :--- | :--- | :--- | :--- |
+| **Administrator** | `admin@recguardian.org` | `password123` | REC Guardian Authority | Full administrative control, all views |
+| **Regulator** | `regulator@recguardian.org` | `password123` | Renewable Energy Regulatory Commission | Market surveillance, case adjudication, graph radar |
+| **Auditor** | `auditor@recguardian.org` | `password123` | Apex Forensic ESG Audit Group | Audit review, ledger verification, evidence inspection |
+| **Generator (Solar)** | `generator@solarfarm.com` | `password123` | Helios Solar Generation LLC | Plant portfolio, submit generation claims, REC wallet |
+| **Generator (Wind)** | `generator2@windpower.com` | `password123` | Boreas Wind Energy Ltd | Plant portfolio, submit generation claims, REC wallet |
+| **Trader** | `trader@energytrade.com` | `password123` | Global Carbon & REC Exchange | P2P certificate transfers, redemption, wallet holdings |
 
 ---
 
 ## 5. Pre-Configured Fraud Scenarios
 
-1. **Clean Legitimate Claim** (`CLM-2026-LEGIT-01`): Conforms to solar meter reading and baseline capacity factor ($\text{Risk} < 15$). Auto-approved and certificate minted.
-2. **Meter Mismatch Overclaim** (`CLM-2026-FRAUD-MTR`): Claimed 3,800 MWh vs metered 1,200 MWh (+216% overclaim). Status `HELD`, Investigation case opened.
-3. **Physical Capacity Violation** (`CLM-2026-FRAUD-CAP`): 50 MW plant claiming 90,000 MWh in a single month (>245% theoretical max capacity). Flagged `CRITICAL`.
-4. **Document Evidence Reuse** (`CLM-2026-FRAUD-DOC`): Wind facility submitting the exact SHA-256 PDF report hash from the Mojave Solar plant.
-5. **Circular Wash Trading Ring**: 3-node cycle (`generator2@windpower.com` $\to$ `trader@energytrade.com` $\to$ `generator@solarfarm.com` $\to$ `generator2@windpower.com`) flagged by NetworkX cycle detection.
+The system database is seeded with 5 representative scenarios demonstrating end-to-end detection:
+
+| Scenario | Target Identifier | Description | Engine Detection | Outcome |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Clean Legitimate Claim** | `CLM-2026-LEGIT-01` | 1,200 MWh claim against 1,195 MWh meter reading. | $\Delta = 0.41\% \le 2.0\%$, normal CF ($3.2\%$). Risk: **14.2 / 100**. | **Auto-Approved**, minted `REC-2026-SOL-09921`. |
+| **2. Meter Mismatch Overclaim** | `CLM-2026-FRAUD-MTR` | Claimed 3,800 MWh vs metered 1,200 MWh ($+216.7\%$). | `RULE-005` (Critical) + ML Isolation Forest outlier ($92.4$). Risk: **88.0 / 100**. | Status **`HELD`**, opened `CASE-2026-MTR-001`. |
+| **3. Physical Capacity Violation** | `CLM-2026-FRAUD-CAP` | 50 MW plant claiming 90,000 MWh in 1 month ($>250\%$ theoretical max). | `RULE-003` & `RULE-004` (Theoretical limit $36,000$ MWh). Risk: **95.0 / 100**. | Status **`HELD`**, opened `CASE-2026-CAP-001`. |
+| **4. Document Evidence Reuse** | `CLM-2026-FRAUD-DOC` | Wind facility submitting exact SHA-256 PDF hash from Mojave Solar. | `RULE-009` (Hash collision across facilities). Risk: **89.5 / 100**. | Status **`HELD`**, Cross-facility alert. |
+| **5. Circular Wash Trading** | `REC-2026-WND-88319` | 3-party transfer cycle ($A \to B \to C \to A$). | NetworkX Directed Graph Cycle Detection. | **Flagged** in Vis.js Network & Lineage. |
+
+For forensic breakdown and evidence reproduction commands, consult [`docs/FRAUD_SCENARIOS_GUIDE.md`](docs/FRAUD_SCENARIOS_GUIDE.md).
 
 ---
 
-## 6. Authentication & Role-Based Portals
+## 6. Certificate Explorer & 6-Stage Lineage Provenance
 
-The frontend and API support dedicated persona-based access control with Bearer JWT tokens:
+Inspect any certificate, claim, or investigation using the `/certificates` Explorer or API:
+```bash
+curl -H "Authorization: Bearer <TOKEN>" \
+  http://127.0.0.1:8000/api/v1/certificates/lineage/CLM-2026-FRAUD-MTR
+```
 
-### A. Energy Generator & Trader Portal
-- **Login Credentials**: `generator@solarfarm.com` or `generator2@windpower.com` (pw: `password123`)
-- **Self-Registration**: Clean energy producers can register new accounts via the registration modal.
-- **Dedicated Capabilities**:
-  - Scoped portfolio overview (only shows the user's registered power facilities and claims).
-  - Generation claim submission modal linked to smart meter telemetry readings.
-  - Digital REC Wallet to inspect owned certificates, execute peer-to-peer transfers, and redeem RECs for Scope 2 compliance.
+The response compiles an institutional 6-stage provenance graph and chronological evidence timeline:
 
-### B. Regulatory & Forensic Authority Portal
-- **Login Credentials**: `regulator@recguardian.org` or `auditor@recguardian.org` (pw: `password123`)
-- **Dedicated Capabilities**:
-  - Macro Forensic Radar displaying market-wide anomaly rates and risk breakdown distributions.
-  - Human-in-the-loop Regulatory Adjudication (`CONFIRM_FRAUD_HOLD` vs `CLEAR_AND_ISSUE`).
-  - NetworkX circular wash-trading loop detection.
-  - SHA-256 Cryptographic Ledger integrity audit & document verification tool.
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Stage 1   │────►│   Stage 2   │────►│   Stage 3   │────►│   Stage 4   │────►│   Stage 5   │────►│   Stage 6   │
+│  Facility   │     │ Smart Meter │     │ Fingerprint │     │ Risk Engine │     │  Ledgering  │     │ Wallet & TX │
+│ Generation  │     │ Telemetry   │     │ Hashes      │     │ Multi-Score │     │  Immutable  │     │ P2P History │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+```
+
+1. **Generation Source**: Nameplate MW, fuel type, utility grid interconnection.
+2. **Smart Meter Telemetry**: Substation serial ID, gross generation, interval window.
+3. **Cryptographic Fingerprint**: SHA-256 claim hash, document evidence hash collision status.
+4. **Forensic Risk Score**: Composite score, deterministic rule breakdown, Isolation Forest outlier index.
+5. **Cryptographic Ledger**: Block height index, event type, block hash, parent hash link.
+6. **Ownership & Trading**: Originating generator, current wallet owner, P2P transfer hops, Scope 2 retirement state.
 
 ---
 
-## 7. Running Automated Tests
+## 7. Automated Test Suite
+
+The test suite runs 19 automated tests covering all engines, API routes, RBAC isolation, and ledger verification:
 
 ```bash
 ./venv/bin/pytest backend/tests -v
 ```
-All 18 automated test cases verify:
-- Deterministic Rule Engine violations (meter mismatch, capacity factor, duplicate fingerprints, document reuse)
-- ML Isolation Forest outlier detection
-- NetworkX circular transfer cycle detection
-- Cryptographic SHA-256 ledger integrity & tamper detection
-- JWT authentication (`POST /auth/login`, `POST /auth/login-json`, `POST /auth/register`)
-- Strict RBAC authorization (generators blocked with HTTP 403 from regulatory adjudication)
-- End-to-end REST API workflows (claims lifecycle, certificate wallet mint/transfer/redeem, analytics)
+
+### Verified Test Cases:
+- `test_health_check`: Root system availability.
+- `test_auth_login`: OAuth2 password form authentication and JWT issuance.
+- `test_auth_login_json_and_roles`: JSON payload authentication and multi-role parsing.
+- `test_auth_registration`: Dynamic generator onboarding and duplicate rejection.
+- `test_list_plants`: Clean energy facility registry and filtering.
+- `test_dashboard_kpis`: Forensic metrics, market volume, and fraud rate aggregation.
+- `test_network_graph_api`: NetworkX graph generation and node/edge topology.
+- `test_ledger_audit_api`: Full cryptographic hash chain traversal and tamper verification.
+- `test_claim_submission_and_evaluation`: Real-time submission, risk fusion, and ledger anchoring.
+- `test_certificate_lifecycle`: Certificate minting, P2P wallet transfers, and Scope 2 redemption.
+- `test_investigation_and_regulatory_decision`: Regulatory adjudication and RBAC protection (HTTP 403 for unauthorized users).
+- `test_certificate_lineage_and_timeline`: 6-stage provenance reconstruction and chronological timeline.
+- `test_rule_engine_meter_mismatch`: Deterministic rule violation on $\Delta > 2\%$.
+- `test_rule_engine_capacity_violation`: Physics violation on impossible capacity factors.
+- `test_rule_engine_duplicate_detection`: SHA-256 fingerprint collision detection.
+- `test_rule_engine_document_reuse`: Evidence document hash collision across facilities.
+- `test_ml_anomaly_engine`: Scikit-learn Isolation Forest multi-dimensional outlier scoring.
+- `test_graph_engine_cycle_detection`: NetworkX circular wash-trading loop detection.
+- `test_ledger_tamper_detection`: Cryptographic detection of simulated historical record tampering.
+
+---
+
+## 8. Hackathon Evaluation Checklist
+
+| Requirement / Criterion | Status | Implementation Details |
+| :--- | :---: | :--- |
+| **Telemetry & Meter Ingestion** | ✅ | Substation telemetry ingestion with timestamp intervals, MWh readings, and payload hashes. |
+| **Meter vs. Claim Tolerance Checks** | ✅ | Calibrated $2\%$ threshold formula flagging over-claims with explainable error margins. |
+| **Physical Capacity Bounds** | ✅ | Nameplate capacity $\times$ hours $\times$ fuel-specific capacity factor validation. |
+| **Duplicate & Collision Prevention** | ✅ | SHA-256 claim fingerprinting and document hash cross-checking. |
+| **Machine Learning Anomaly Detection**| ✅ | Scikit-learn Isolation Forest detecting multivariate statistical deviations. |
+| **Graph Wash Trading Surveillance** | ✅ | NetworkX directed graph analysis with Johnson's cycle detection and Vis.js physics UI. |
+| **Cryptographic Immutability** | ✅ | Append-only SHA-256 hash chain with automated tamper detection traversal. |
+| **Regulatory Case Management** | ✅ | Case dockets with evidence timeline and human-in-the-loop judicial decisions. |
+| **Institutional GovTech Design** | ✅ | Clean Energy Emerald (`#059669`) & Regulatory Cobalt (`#1d4ed8`) high-contrast theme. |
+| **Role-Based Portals & JWT Auth** | ✅ | Dedicated views for Regulators, Auditors, and Generators with strict RBAC enforcement. |
+| **Zero-Node Quick Start Option** | ✅ | Embedded React 18 SPA served directly by FastAPI alongside production Next.js 14 app. |
