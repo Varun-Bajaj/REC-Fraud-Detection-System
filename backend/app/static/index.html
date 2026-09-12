@@ -3,59 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>REC Guardian | Renewable Energy Certificate Fraud Surveillance</title>
-  <!-- Tailwind CSS -->
+  <title>REC Guardian | Fraud Detection Platform</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React 18 & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Vis-Network for Graph Visualization -->
   <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-  <!-- FontAwesome / Lucide Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
           colors: {
-            brand: {
-              50: '#ecfdf5',
-              100: '#d1fae5',
-              500: '#10b981',
-              600: '#059669',
-              700: '#047857',
-              800: '#065f46',
-              900: '#064e3b',
-            },
-            dark: {
-              800: '#1e293b',
-              850: '#172033',
-              900: '#0f172a',
-              950: '#090d16',
-            }
+            forest: { 950: '#0c2419', 900: '#143d2b', 800: '#1b4d37', 700: '#236549' },
+            leaf:   { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534' },
+            sprout: { 300: '#bef264', 400: '#a3e635', 500: '#84cc16', 600: '#65a30d' },
+            sage:   { 50: '#f8faf7', 100: '#f0f7f2', 200: '#e2ece5', 300: '#c8ded0', 400: '#9bbfaa', 500: '#6b9e7d', 600: '#4b6858', 800: '#233d2e' },
           }
         }
       }
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    code, .font-mono { font-family: 'JetBrains Mono', monospace; }
-    /* Custom scrollbars */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    * { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #f0f7f2; }
+    ::-webkit-scrollbar-thumb { background: #c8ded0; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9bbfaa; }
+    .bg-leaf-pattern {
+      background-color: #f0fdf4;
+      background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2315803d' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    .glass-card {
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .gradient-forest { background: linear-gradient(135deg, #0c2419 0%, #143d2b 50%, #1b4d37 100%); }
+    .gradient-leaf { background: linear-gradient(135deg, #15803d 0%, #16a34a 100%); }
+    .ring-leaf { box-shadow: 0 0 0 3px rgba(21,128,61,0.2); }
+    .shadow-premium { box-shadow: 0 4px 24px rgba(20,61,43,0.10), 0 1px 4px rgba(20,61,43,0.06); }
+    .shadow-card { box-shadow: 0 2px 12px rgba(20,61,43,0.07), 0 1px 3px rgba(20,61,43,0.05); }
+    .hover-card:hover { box-shadow: 0 8px 30px rgba(20,61,43,0.13), 0 2px 8px rgba(20,61,43,0.07); transform: translateY(-1px); }
+    .transition-premium { transition: all 0.2s cubic-bezier(0.4,0,0.2,1); }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .animate-slide-in { animation: slideIn 0.3s ease-out; }
+    @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+    .score-ring { background: conic-gradient(currentColor var(--pct), #e2ece5 0); }
+    input, select, textarea { outline: none; }
+    input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(21,128,61,0.18); border-color: #15803d !important; }
+    .btn-primary { background: linear-gradient(135deg, #15803d 0%, #16a34a 100%); color: white; transition: all 0.2s; }
+    .btn-primary:hover { background: linear-gradient(135deg, #166534 0%, #15803d 100%); box-shadow: 0 4px 14px rgba(21,128,61,0.35); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .nav-tab.active { background: #15803d; color: white; box-shadow: 0 2px 8px rgba(21,128,61,0.3); }
+    .nav-tab:not(.active):hover { background: #f0f7f2; color: #143d2b; }
+    .table-row:hover { background: #f8faf7; }
+    .persona-card { cursor:pointer; transition: all 0.2s; border: 2px solid transparent; }
+    .persona-card:hover { border-color: #15803d; background: #f0fdf4; transform: translateY(-2px); box-shadow: 0 4px 14px rgba(21,128,61,0.15); }
+    .persona-card.selected { border-color: #15803d; background: #dcfce7; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-red { background: #fef2f2; color: #991b1b; }
+    .badge-amber { background: #fffbeb; color: #92400e; }
+    .badge-blue { background: #eff6ff; color: #1e40af; }
+    .badge-gray { background: #f1f5f9; color: #475569; }
+    .badge-forest { background: #143d2b; color: white; }
+    .badge-lime { background: #f7fee7; color: #3f6212; border: 1px solid #bef264; }
+    .modal-overlay { background: rgba(12,36,25,0.6); backdrop-filter: blur(4px); }
   </style>
 </head>
-<body class="bg-dark-900 text-slate-100 min-h-screen flex flex-col">
+<body class="bg-sage-50 text-forest-900 min-h-screen antialiased">
   <div id="root"></div>
-
-  <!-- Main React App Script -->
   <script type="text/babel" src="/static/app.js"></script>
 </body>
 </html>

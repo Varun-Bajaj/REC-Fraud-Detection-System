@@ -110,7 +110,6 @@ backend/*.db
 *.crt
 secrets.toml
 .streamlit/secrets.toml
-
 # ==========================================
 # IDE & Code Editors
 # ==========================================
@@ -143,6 +142,3 @@ logs/
 *.pid
 *.seed
 *.pid.lock
-
-
-.env

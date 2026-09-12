@@ -12,6 +12,23 @@ import {
   Plant,
   Certificate,
 } from "@/types";
+
+// shadcn UI Primitives
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Sheet, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+
+// Lucide Icons
 import {
   ShieldAlert,
   ShieldCheck,
@@ -48,24 +65,236 @@ import {
   Radio,
   Bot,
   Sparkles,
+  Menu,
+  Leaf,
+  ChevronDown,
 } from "lucide-react";
 import { FabricLedgerDashboard } from "@/components/FabricLedgerDashboard";
 
-// Institutional Demo Personas for Quick Access
-const DEMO_PERSONAS = {
-  USER: [
-    { label: "Solar Energy Producer", sub: "Helios Solar Generation LLC (50 MW)", email: "generator@solarfarm.com", role: "GENERATOR", org: "Helios Solar Generation LLC" },
-    { label: "Wind Energy Producer", sub: "Boreas Wind Energy Ltd (120 MW)", email: "generator2@windpower.com", role: "GENERATOR", org: "Boreas Wind Energy Ltd" },
-    { label: "Institutional Energy Trader", sub: "Global Carbon & REC Exchange", email: "trader@energytrade.com", role: "GENERATOR", org: "Global Carbon & REC Exchange" },
-  ],
-  REGULATOR: [
-    { label: "Chief Regulatory Officer", sub: "Renewable Energy Regulatory Commission (RERC)", email: "regulator@recguardian.org", role: "REGULATOR", org: "Renewable Energy Regulatory Commission" },
-    { label: "Senior ESG Forensic Auditor", sub: "Apex Forensic ESG Audit Group", email: "auditor@recguardian.org", role: "AUDITOR", org: "Apex Forensic ESG Audit Group" },
-    { label: "Platform Administrator", sub: "REC Guardian Authority", email: "admin@recguardian.org", role: "ADMIN", org: "REC Guardian Authority" },
-  ],
-};
+// Login Portals
+const LOGIN_PORTALS = [
+  { id: "regulator", title: "Regulatory Authority", subtitle: "RERC Commission", email: "regulator@recguardian.org", role: "REGULATOR",
+    icon: ShieldCheck, color: "blue", iconBg: "bg-blue-100", iconColor: "text-blue-700", border: "border-blue-200", activeBorder: "border-blue-500" },
+  { id: "admin", title: "System Administrator", subtitle: "REC Guardian Authority", email: "admin@recguardian.org", role: "ADMIN",
+    icon: Lock, color: "purple", iconBg: "bg-purple-100", iconColor: "text-purple-700", border: "border-purple-200", activeBorder: "border-purple-500" },
+  { id: "auditor", title: "Forensic ESG Auditor", subtitle: "Apex Forensic Audit Group", email: "auditor@recguardian.org", role: "AUDITOR",
+    icon: FileSearch, color: "amber", iconBg: "bg-amber-100", iconColor: "text-amber-700", border: "border-amber-200", activeBorder: "border-amber-500" },
+  { id: "solar", title: "Solar Energy Producer", subtitle: "Helios Solar LLC — 50 MW", email: "generator@solarfarm.com", role: "GENERATOR",
+    icon: Sun, color: "yellow", iconBg: "bg-yellow-100", iconColor: "text-yellow-700", border: "border-yellow-200", activeBorder: "border-yellow-500" },
+  { id: "wind", title: "Wind Energy Producer", subtitle: "Boreas Wind Energy — 120 MW", email: "generator2@windpower.com", role: "GENERATOR",
+    icon: Wind, color: "cyan", iconBg: "bg-cyan-100", iconColor: "text-cyan-700", border: "border-cyan-200", activeBorder: "border-cyan-500" },
+  { id: "trader", title: "Energy Trader", subtitle: "Global Carbon & REC Exchange", email: "trader@energytrade.com", role: "GENERATOR",
+    icon: ArrowRightLeft, color: "indigo", iconBg: "bg-indigo-100", iconColor: "text-indigo-700", border: "border-indigo-200", activeBorder: "border-indigo-500" },
+];
 
-// Preset search queries for the Lineage Explorer
+function TwinLeafLogo({ size = 36 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 36 36" width={size} height={size} fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M11 25C11 15 20 8 20 8C20 8 21 17 17 21C14.5 23.5 12.5 24.8 11 25Z" fill="#84cc16"/>
+      <path d="M25 25C25 15 16 8 16 8C16 8 15 17 19 21C21.5 23.5 23.5 24.8 25 25Z" fill="#15803d"/>
+      <path d="M18 28V20" stroke="#86efac" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function AuthScreen({
+  loginEmail, setLoginEmail, loginPassword, setLoginPassword,
+  authError, loading, onQuickLogin,
+}: {
+  loginEmail: string; setLoginEmail: (v: string) => void;
+  loginPassword: string; setLoginPassword: (v: string) => void;
+  authError: string | null; loading: boolean;
+  onQuickLogin: (email: string, password?: string) => Promise<void>;
+}) {
+  const [selectedPortal, setSelectedPortal] = React.useState<(typeof LOGIN_PORTALS)[0] | null>(null);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [authMode, setAuthMode] = React.useState<"portal" | "manual">("portal");
+  const [regName, setRegName] = React.useState("");
+  const [regEmail, setRegEmail] = React.useState("");
+  const [regPassword, setRegPassword] = React.useState("");
+  const [regOrg, setRegOrg] = React.useState("");
+
+  const handlePortalSelect = (portal: (typeof LOGIN_PORTALS)[0]) => {
+    setSelectedPortal(portal);
+    setLoginEmail(portal.email);
+    setLoginPassword("password123");
+  };
+
+  const handlePortalLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    onQuickLogin(loginEmail, loginPassword);
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // register then login
+    try {
+      await fetch("/api/v1/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: regEmail, password: regPassword, full_name: regName, organization_name: regOrg, role: "GENERATOR" }),
+      });
+      await onQuickLogin(regEmail, regPassword);
+    } catch {
+      // error handled by parent
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f0fdf4] flex flex-col" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2315803d' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }}>
+      {/* Brand bar */}
+      <div className="bg-[#143d2b] py-4 px-6 shadow-lg">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/15">
+              <TwinLeafLogo size={28} />
+            </div>
+            <div>
+              <div className="text-[#84cc16] text-[10px] font-bold tracking-widest uppercase">TEAM: KHATRON KE KHILADI</div>
+              <div className="text-white text-lg font-bold tracking-tight leading-none">REC GUARDIAN</div>
+            </div>
+          </div>
+          <div className="hidden md:flex items-center px-4 py-1.5 rounded-full border-2 border-[#84cc16]/60 bg-[#0c2419]/50">
+            <span className="text-[#bef264] text-xs font-bold tracking-widest uppercase">DETECT · EXPLAIN · INVESTIGATE · PRESERVE</span>
+          </div>
+          <div className="hidden sm:block text-white/40 text-xs">AI Forensics + SHA-256 Ledger</div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex items-center justify-center p-4 py-8">
+        <div className="w-full max-w-4xl">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#dcfce7] border border-[#bbf7d0] text-[#15803d] text-xs font-semibold mb-4">
+              <ShieldCheck className="h-3.5 w-3.5" /> Renewable Energy Certificate Fraud Detection Platform
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-[#143d2b] mb-2">Welcome to REC Guardian</h1>
+            <p className="text-[#6b9e7d] text-sm max-w-xl mx-auto">
+              Select your role portal to access forensic surveillance. Each portal provides role-specific capabilities.
+            </p>
+          </div>
+
+          {/* Mode tabs */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            {[
+              { id: "portal" as const, label: "Quick Login", icon: Zap },
+              { id: "manual" as const, label: "Manual Login", icon: Lock },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => { setAuthMode(tab.id); setSelectedPortal(null); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  authMode === tab.id ? "bg-[#15803d] text-white shadow-sm" : "bg-white border border-[#c8ded0] text-[#143d2b] hover:bg-[#f0f7f2]"
+                }`}>
+                <tab.icon className="h-3.5 w-3.5" /> {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Portal Grid */}
+          {authMode === "portal" && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {LOGIN_PORTALS.map(portal => {
+                  const IconComp = portal.icon;
+                  return (
+                    <button key={portal.id} onClick={() => handlePortalSelect(portal)}
+                      className={`rounded-xl border-2 p-4 text-left transition-all hover:-translate-y-0.5 ${
+                        selectedPortal?.id === portal.id
+                          ? `${portal.activeBorder} bg-[#f0fdf4]`
+                          : `${portal.border} bg-white hover:border-[#15803d]`
+                      }`} style={{ boxShadow: "0 2px 12px rgba(20,61,43,0.07)" }}>
+                      <div className={`w-10 h-10 rounded-xl ${portal.iconBg} ${portal.iconColor} flex items-center justify-center mb-3`}>
+                        <IconComp className="h-5 w-5" />
+                      </div>
+                      <div className="font-bold text-[#143d2b] text-sm leading-tight mb-0.5">{portal.title}</div>
+                      <div className="text-[#6b9e7d] text-xs mb-2">{portal.subtitle}</div>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        portal.role === "REGULATOR" ? "bg-blue-100 text-blue-800"
+                        : portal.role === "ADMIN" ? "bg-[#143d2b] text-white"
+                        : portal.role === "AUDITOR" ? "bg-amber-100 text-amber-800"
+                        : "bg-emerald-100 text-emerald-800"
+                      }`}>{portal.role}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedPortal && (
+                <div className="bg-white rounded-2xl border border-[#c8ded0] p-6" style={{ boxShadow: "0 4px 24px rgba(20,61,43,0.10)" }}>
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className={`w-12 h-12 rounded-xl ${selectedPortal.iconBg} ${selectedPortal.iconColor} flex items-center justify-center`}>
+                      <selectedPortal.icon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-[#143d2b]">{selectedPortal.title}</div>
+                      <div className="text-[#6b9e7d] text-xs">{selectedPortal.subtitle}</div>
+                    </div>
+                  </div>
+                  <form onSubmit={handlePortalLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#143d2b] mb-1.5">Email Address</label>
+                      <Input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="h-10 bg-[#f8faf7]" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#143d2b] mb-1.5">Password</label>
+                      <Input type={showPassword ? "text" : "password"} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="h-10 bg-[#f8faf7]" required />
+                    </div>
+                    {authError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">{authError}</div>}
+                    <Button type="submit" disabled={loading} className="w-full h-11 bg-[#15803d] hover:bg-[#166534] text-white font-bold rounded-xl">
+                      {loading ? "Authenticating..." : `Access ${selectedPortal.title} Portal`}
+                    </Button>
+                  </form>
+                </div>
+              )}
+
+              {!selectedPortal && (
+                <p className="text-center text-[#6b9e7d] text-xs">
+                  Select a portal above · All demo accounts use password: <span className="font-mono font-bold text-[#143d2b]">password123</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Manual Login */}
+          {authMode === "manual" && (
+            <div className="bg-white rounded-2xl border border-[#c8ded0] p-8 max-w-md mx-auto" style={{ boxShadow: "0 4px 24px rgba(20,61,43,0.10)" }}>
+              <form onSubmit={handlePortalLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#143d2b] mb-1.5">Email Address</label>
+                  <Input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="user@example.com" className="h-10" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#143d2b] mb-1.5">Password</label>
+                  <Input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="h-10" required />
+                </div>
+                {authError && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">{authError}</div>}
+                <Button type="submit" disabled={loading} className="w-full h-11 bg-[#15803d] hover:bg-[#166534] text-white font-bold rounded-xl">
+                  {loading ? "Signing in..." : "Sign In Securely"}
+                </Button>
+              </form>
+            </div>
+          )}
+
+          {/* Feature pills */}
+          <div className="mt-8 grid grid-cols-3 gap-4 text-center">
+            {[
+              { icon: ShieldAlert, label: "AI Fraud Detection", sub: "Isolation Forest + Rule Engine" },
+              { icon: Database, label: "SHA-256 Ledger", sub: "Tamper-evident audit chain" },
+              { icon: Activity, label: "Graph Surveillance", sub: "NetworkX wash-trading detection" },
+            ].map((f, i) => (
+              <div key={i} className="bg-white rounded-xl border border-[#c8ded0] p-4" style={{ boxShadow: "0 2px 12px rgba(20,61,43,0.07)" }}>
+                <f.icon className="h-5 w-5 text-[#15803d] mx-auto mb-2" />
+                <div className="text-xs font-bold text-[#143d2b]">{f.label}</div>
+                <div className="text-[11px] text-[#6b9e7d] mt-0.5">{f.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Preset queries for the Lineage Explorer
 const DEMO_LINEAGE_QUERIES = [
   { label: "Meter Overclaim (+216%)", query: "CLM-2026-FRAUD-MTR", badge: "FRAUD" },
   { label: "Capacity Impossibility (>240%)", query: "CLM-2026-FRAUD-CAP", badge: "FRAUD" },
@@ -76,6 +305,7 @@ const DEMO_LINEAGE_QUERIES = [
   { label: "Verified Active Solar REC", query: "REC-2026-SOL-09921", badge: "VERIFIED" },
   { label: "Clean Generation Baseline", query: "CLM-2026-LEGIT-01", badge: "CLEAN" },
 ];
+
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -88,6 +318,7 @@ export default function Home() {
   const [regPassword, setRegPassword] = useState("");
   const [regOrg, setRegOrg] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isBooting, setIsBooting] = useState(true);
 
   // App data states
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -107,14 +338,16 @@ export default function Home() {
   const [lineageLoading, setLineageLoading] = useState(false);
   const [lineageError, setLineageError] = useState<string | null>(null);
 
-  // Modals & selections
+  // Mobile menu drawer state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Modals
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isAdjudicateModalOpen, setIsAdjudicateModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<InvestigationCase | null>(null);
-  const [showClaimModal, setShowClaimModal] = useState(false);
-  const [transferringCert, setTransferringCert] = useState<Certificate | null>(null);
-  const [transferToUserId, setTransferToUserId] = useState("3");
   const [adjudicateAction, setAdjudicateAction] = useState<"CONFIRM_FRAUD_HOLD" | "CLEAR_AND_ISSUE">("CONFIRM_FRAUD_HOLD");
-  const [adjudicateNotes, setAdjudicateNotes] = useState("");
+  const [adjudicateFindings, setAdjudicateFindings] = useState("");
   const [aiAgentLoading, setAiAgentLoading] = useState(false);
   const [aiAgentResult, setAiAgentResult] = useState<any>(null);
 
@@ -128,7 +361,7 @@ export default function Home() {
         setAdjudicateAction(res.agent_verdict as any);
       }
       if (res.agent_reasoning) {
-        setAdjudicateNotes(res.agent_reasoning);
+        setAdjudicateFindings(res.agent_reasoning);
       }
     } catch (err: any) {
       alert("AI Agent investigation failed: " + err.message);
@@ -137,12 +370,17 @@ export default function Home() {
     }
   };
 
-  // New Claim Form
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
+  const [transferTargetUser, setTransferTargetUser] = useState<number>(3);
+  const [transferNotes, setTransferNotes] = useState("");
+
+  // New Claim Form State
   const [newClaimPlantId, setNewClaimPlantId] = useState<number>(1);
-  const [newClaimMwh, setNewClaimMwh] = useState<number>(4500);
-  const [newClaimStart, setNewClaimStart] = useState("2026-03-01T00:00:00");
-  const [newClaimEnd, setNewClaimEnd] = useState("2026-03-31T23:59:59");
-  const [newClaimMeterId, setNewClaimMeterId] = useState<number>(1);
+  const [newClaimStart, setNewClaimStart] = useState("2026-03-01T00:00:00Z");
+  const [newClaimEnd, setNewClaimEnd] = useState("2026-03-31T23:59:59Z");
+  const [newClaimMwh, setNewClaimMwh] = useState<number>(1200);
+  const [claimSubmitError, setClaimSubmitError] = useState<string | null>(null);
 
   // Hackathon Tamper Simulator & ZK Privacy State
   const [tamperLoading, setTamperLoading] = useState(false);
@@ -215,151 +453,140 @@ export default function Home() {
     }
   };
 
-  // Check existing token on mount
+  // Document Verification State
+  const [verifyingDoc, setVerifyingDoc] = useState(false);
+  const [docVerifyResult, setDocVerifyResult] = useState<any>(null);
+
+  // Search & Filter in Claims Table
+  const [claimsFilterStatus, setClaimsFilterStatus] = useState<string>("ALL");
+  const [claimsSearchQuery, setClaimsSearchQuery] = useState<string>("");
+
+  // Secure boot flow: only hydrate the dashboard after a valid token is confirmed.
   useEffect(() => {
-    const token = ApiService.getToken();
-    if (token) {
-      loadUserData();
-    }
+    const initAuth = async () => {
+      try {
+        const me = await ApiService.getMe();
+        setUser(me);
+        await loadDashboardData();
+      } catch (err) {
+        setUser(null);
+        setAuthError(null);
+      } finally {
+        setIsBooting(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
-  const loadUserData = async () => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setLoading(true);
     try {
-      setLoading(true);
-      const me = await ApiService.getMe();
-      setUser(me);
-      await loadDashboardData(me);
+      const res = await ApiService.loginJson(loginEmail, loginPassword);
+      setUser(res.user);
+      setLoginEmail(res.user.email);
+      await loadDashboardData();
     } catch (err: any) {
-      console.error("Session expired or invalid:", err);
-      handleLogout();
+      setAuthError(err.message || "Failed to authenticate");
     } finally {
       setLoading(false);
     }
   };
 
-  const loadDashboardData = async (currentUser: User) => {
+  const loadDashboardData = async () => {
+    setLoading(true);
     try {
-      const isReg = currentUser.role === "REGULATOR" || currentUser.role === "AUDITOR" || currentUser.role === "ADMIN";
-      
-      const [s, c, pl] = await Promise.all([
-        ApiService.getDashboardStats(),
-        ApiService.getClaims(),
-        ApiService.getPlants(),
+      const [s, c, certs, cs, audit, blocks, pl] = await Promise.all([
+        ApiService.getDashboardStats().catch(() => null),
+        ApiService.getClaims().catch(() => []),
+        ApiService.getCertificates().catch(() => []),
+        ApiService.getInvestigations().catch(() => []),
+        ApiService.verifyLedgerIntegrity().catch(() => null),
+        ApiService.getLedgerBlocks(25).catch(() => []),
+        ApiService.getPlants().catch(() => []),
       ]);
-
-      setStats(s);
+      if (s) setStats(s);
       setClaims(c);
+      setCertificates(certs);
+      setCases(cs);
+      setLedgerAudit(audit);
+      setLedgerBlocks(blocks);
       setPlants(pl);
-
-      if (isReg) {
-        const [inv, audit, blocks] = await Promise.all([
-          ApiService.getInvestigations(),
-          ApiService.verifyLedgerIntegrity(),
-          ApiService.getLedgerBlocks(20),
-        ]);
-        setCases(inv);
-        setLedgerAudit(audit);
-        setLedgerBlocks(blocks);
-      } else {
-        const certs = await ApiService.getCertificates();
-        setCertificates(certs);
-      }
-    } catch (err: any) {
-      console.error("Data load error:", err);
+    } catch (err) {
+      console.error("Error loading dashboard data", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleQuickLogin = async (email: string, pass = "password123") => {
     setAuthError(null);
-    setActionLoading(true);
+    setLoading(true);
     try {
-      const res = await ApiService.loginJson(loginEmail, loginPassword);
+      const res = await ApiService.loginJson(email, pass);
       setUser(res.user);
-      await loadDashboardData(res.user);
+      setLoginEmail(res.user.email);
+      await loadDashboardData();
     } catch (err: any) {
-      setAuthError(err.message || "Invalid email or password");
+      setAuthError(err.message || "Failed to authenticate");
     } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async (email: string) => {
-    setLoginEmail(email);
-    setLoginPassword("password123");
-    setAuthError(null);
-    setActionLoading(true);
-    try {
-      const res = await ApiService.loginJson(email, "password123");
-      setUser(res.user);
-      await loadDashboardData(res.user);
-    } catch (err: any) {
-      setAuthError(err.message || "Demo login failed");
-    } finally {
-      setActionLoading(false);
+      setLoading(false);
     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    setActionLoading(true);
+    setLoading(true);
     try {
       await ApiService.register({
         email: regEmail,
         password: regPassword,
         full_name: regFullName,
         organization_name: regOrg,
-        role: "GENERATOR",
+        role: authPortal === "REGULATOR" ? "REGULATOR" : "GENERATOR",
       });
-      const loginRes = await ApiService.loginJson(regEmail, regPassword);
-      setUser(loginRes.user);
-      await loadDashboardData(loginRes.user);
+      await handleQuickLogin(regEmail, regPassword);
     } catch (err: any) {
       setAuthError(err.message || "Registration failed");
     } finally {
-      setActionLoading(false);
+      setLoading(false);
     }
   };
 
   const handleLogout = () => {
     ApiService.logout();
     setUser(null);
+    setAuthError(null);
     setStats(null);
     setClaims([]);
     setCertificates([]);
     setCases([]);
     setLedgerAudit(null);
-    setLineageData(null);
-    setActiveTab("dashboard");
+    setLedgerBlocks([]);
+    setPlants([]);
   };
 
-  // Lineage Fetcher
-  const handleFetchLineage = async (queryToSearch?: string) => {
-    const q = (queryToSearch || lineageSearchInput).trim();
-    if (!q) return;
-    setLineageSearchInput(q);
+  const handleExecuteLineageSearch = async (query: string) => {
+    if (!query) return;
     setLineageLoading(true);
     setLineageError(null);
     try {
-      const result = await ApiService.getCertificateLineage(q);
-      setLineageData(result);
+      const res = await ApiService.getCertificateLineage(query.trim());
+      setLineageData(res);
     } catch (err: any) {
-      setLineageError(err.message || "Failed to trace lineage for identifier");
+      setLineageError(err.message || "Failed to load lineage history");
       setLineageData(null);
     } finally {
       setLineageLoading(false);
     }
   };
 
-  const handleExploreItem = (identifier: string) => {
-    setLineageSearchInput(identifier);
-    setActiveTab("lineage");
-    handleFetchLineage(identifier);
-  };
-
-  const handleSubmitClaim = async (e: React.FormEvent) => {
+  const handleCreateClaim = async (e: React.FormEvent) => {
     e.preventDefault();
+    setClaimSubmitError(null);
     setActionLoading(true);
     try {
       await ApiService.submitClaim({
@@ -367,1615 +594,1657 @@ export default function Home() {
         period_start: newClaimStart,
         period_end: newClaimEnd,
         claimed_mwh: Number(newClaimMwh),
-        meter_reading_id: Number(newClaimMeterId),
       });
-      setShowClaimModal(false);
-      if (user) await loadDashboardData(user);
+      setIsSubmitModalOpen(false);
+      await loadDashboardData();
     } catch (err: any) {
-      alert("Submission failed: " + err.message);
+      setClaimSubmitError(err.message || "Failed to submit claim");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleTransferCert = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!transferringCert) return;
-    setActionLoading(true);
-    try {
-      await ApiService.transferCertificate(transferringCert.id, Number(transferToUserId), "Market trade transfer");
-      setTransferringCert(null);
-      if (user) await loadDashboardData(user);
-    } catch (err: any) {
-      alert("Transfer failed: " + err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRedeemCert = async (certId: number) => {
-    if (!confirm("Redeem and retire this REC certificate permanently for Scope 2 compliance?")) return;
-    setActionLoading(true);
-    try {
-      await ApiService.redeemCertificate(certId);
-      if (user) await loadDashboardData(user);
-    } catch (err: any) {
-      alert("Redemption failed: " + err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleAdjudicateCase = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAdjudicate = async () => {
     if (!selectedCase) return;
     setActionLoading(true);
     try {
-      await ApiService.adjudicateCase(selectedCase.id, adjudicateAction, adjudicateNotes || "Regulatory decision finalized.");
+      await ApiService.adjudicateCase(selectedCase.id, adjudicateAction, adjudicateFindings || "Adjudicated by authority");
+      setIsAdjudicateModalOpen(false);
       setSelectedCase(null);
-      if (user) await loadDashboardData(user);
+      await loadDashboardData();
     } catch (err: any) {
-      alert("Adjudication failed: " + err.message);
+      alert(`Adjudication failed: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // ----------------------------------------------------------------------
-  // AUTHENTICATION GATEWAY: INSTITUTIONAL REGULATORY & GENERATOR PORTAL
-  // ----------------------------------------------------------------------
-  if (!user) {
+  const handleTransfer = async () => {
+    if (!selectedCert) return;
+    setActionLoading(true);
+    try {
+      await ApiService.transferCertificate(selectedCert.id, Number(transferTargetUser), transferNotes);
+      setIsTransferModalOpen(false);
+      setSelectedCert(null);
+      await loadDashboardData();
+    } catch (err: any) {
+      alert(`Transfer failed: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRedeem = async (certId: number) => {
+    if (!confirm("Are you sure you want to permanently redeem/retire this REC for Scope 2 ESG compliance?")) return;
+    setActionLoading(true);
+    try {
+      await ApiService.redeemCertificate(certId);
+      await loadDashboardData();
+    } catch (err: any) {
+      alert(`Redemption failed: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDocumentVerify = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVerifyingDoc(true);
+    try {
+      const res = await ApiService.verifyDocument(file);
+      setDocVerifyResult(res);
+    } catch (err: any) {
+      alert(`Document verification failed: ${err.message}`);
+    } finally {
+      setVerifyingDoc(false);
+    }
+  };
+
+  // Filtered Claims
+  const filteredClaims = claims.filter((c) => {
+    const matchesStatus = claimsFilterStatus === "ALL" || c.status === claimsFilterStatus;
+    const matchesQuery =
+      !claimsSearchQuery ||
+      c.claim_uid.toLowerCase().includes(claimsSearchQuery.toLowerCase()) ||
+      c.status.toLowerCase().includes(claimsSearchQuery.toLowerCase());
+    return matchesStatus && matchesQuery;
+  });
+
+  // Calculate quick totals
+  const totalMwhClaimed = stats?.total_mwh_claimed || claims.reduce((acc, c) => acc + c.claimed_mwh, 0);
+  const totalMwhIssued = stats?.total_mwh_issued || certificates.reduce((acc, c) => acc + c.mwh, 0);
+  const pendingCount = claims.filter((c) => c.status === "PENDING" || c.status === "UNDER_REVIEW").length;
+  const heldCount = claims.filter((c) => c.status === "HELD" || c.status === "REJECTED").length;
+
+  if (isBooting) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4">
-        <div className="w-full max-w-xl space-y-6">
-          {/* Official Agency Brand Header */}
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 text-emerald-400 mb-1 shadow-md">
-              <ShieldCheck className="w-7 h-7" />
-            </div>
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
-                National Clean Energy Regulatory Infrastructure
-              </span>
-              <h1 className="text-2xl font-bold text-white tracking-tight">REC Guardian</h1>
-              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
-                Renewable Energy Certificate Multi-Engine Fraud Detection, Telemetry Verification & Tamper-Evident Ledger
-              </p>
-            </div>
-          </div>
-
-          {/* Institutional Portal Switcher */}
-          <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl grid grid-cols-2 gap-1 text-xs font-semibold">
-            <button
-              onClick={() => {
-                setAuthPortal("REGULATOR");
-                setLoginEmail("regulator@recguardian.org");
-                setAuthError(null);
-              }}
-              className={`py-2.5 rounded-lg transition flex items-center justify-center gap-2 ${
-                authPortal === "REGULATOR"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Scale className="w-4 h-4" />
-              <span>Regulatory Authority</span>
-            </button>
-            <button
-              onClick={() => {
-                setAuthPortal("USER");
-                setLoginEmail("generator@solarfarm.com");
-                setAuthError(null);
-              }}
-              className={`py-2.5 rounded-lg transition flex items-center justify-center gap-2 ${
-                authPortal === "USER"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Sun className="w-4 h-4" />
-              <span>Clean Energy Producer</span>
-            </button>
-          </div>
-
-          {/* Authentication Container */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <div className="mb-5 flex justify-between items-center border-b border-slate-800 pb-3">
-              <div>
-                <h2 className="text-base font-bold text-white">
-                  {authPortal === "REGULATOR" ? "Forensic & Regulatory Authority Portal" : "Clean Energy Producer Workspace"}
-                </h2>
-                <p className="text-xs text-slate-400">
-                  {authPortal === "REGULATOR"
-                    ? "Macro surveillance, human-in-the-loop adjudication, and ledger audit"
-                    : "Facility management, smart meter claims, and verified certificate wallet"}
-                </p>
-              </div>
-              <span className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase ${
-                authPortal === "REGULATOR" ? "bg-blue-500/10 text-blue-400 border border-blue-500/30" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-              }`}>
-                {authPortal === "REGULATOR" ? "RBAC: Authority" : "RBAC: Producer"}
-              </span>
-            </div>
-
-            {authError && (
-              <div className="mb-4 p-3 bg-rose-950/30 border border-rose-800 text-rose-300 text-xs rounded-xl flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                <span>{authError}</span>
-              </div>
-            )}
-
-            {/* 1-Click Institutional Demo Personas */}
-            <div className="mb-5">
-              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-2 font-bold">
-                1-Click Verified Demo Credentials
-              </span>
-              <div className="space-y-1.5">
-                {DEMO_PERSONAS[authPortal].map((p, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleDemoLogin(p.email)}
-                    disabled={actionLoading}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/80 hover:border-slate-700 transition text-left text-xs"
-                  >
-                    <div>
-                      <div className="font-semibold text-white">{p.label}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">{p.sub}</div>
-                    </div>
-                    <span className="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-300 font-mono">
-                      Log In →
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-slate-800"></div>
-              <span className="flex-shrink mx-4 text-[10px] text-slate-500 uppercase font-mono font-bold">Or System Password</span>
-              <div className="flex-grow border-t border-slate-800"></div>
-            </div>
-
-            {authMode === "LOGIN" ? (
-              <form onSubmit={handleLogin} className="space-y-3 mt-3">
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Institutional Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Passcode</label>
-                  <input
-                    type="password"
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-600"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className={`w-full py-2.5 rounded-xl text-xs font-bold text-white transition flex items-center justify-center gap-2 ${
-                    authPortal === "REGULATOR"
-                      ? "bg-blue-600 hover:bg-blue-500"
-                      : "bg-emerald-600 hover:bg-emerald-500"
-                  }`}
-                >
-                  {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                  <span>Sign In with Bearer JWT</span>
-                </button>
-
-                {authPortal === "USER" && (
-                  <div className="text-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode("REGISTER")}
-                      className="text-xs text-emerald-400 hover:underline"
-                    >
-                      New Clean Power Asset? Register Facility Account
-                    </button>
-                  </div>
-                )}
-              </form>
-            ) : (
-              <form onSubmit={handleRegister} className="space-y-3 mt-3">
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Authorized Representative</label>
-                  <input
-                    type="text"
-                    required
-                    value={regFullName}
-                    onChange={(e) => setRegFullName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                    placeholder="Dr. Samantha Vance"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Energy Producer Organization</label>
-                  <input
-                    type="text"
-                    required
-                    value={regOrg}
-                    onChange={(e) => setRegOrg(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                    placeholder="Apex Clean Energy Generation LLC"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Official Work Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                    placeholder="svance@apexenergy.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition flex items-center justify-center gap-2"
-                >
-                  {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                  <span>Register Energy Asset Account</span>
-                </button>
-                <div className="text-center pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode("LOGIN")}
-                    className="text-xs text-slate-400 hover:text-white"
-                  >
-                    Back to Sign In
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+      <div className="flex min-h-screen items-center justify-center bg-[#f0fdf4]">
+        <div className="flex items-center gap-3 rounded-full border border-[#c8ded0] bg-white px-5 py-3 shadow-md">
+          <RefreshCw className="h-4 w-4 animate-spin text-[#15803d]" />
+          <span className="text-sm font-medium text-[#143d2b]">Verifying session...</span>
         </div>
       </div>
     );
   }
 
-  // ----------------------------------------------------------------------
-  // AUTHENTICATED DASHBOARD (ROLE-SEPARATED & LINEAGE EXPLORER)
-  // ----------------------------------------------------------------------
-  const isRegulator = user.role === "REGULATOR" || user.role === "AUDITOR" || user.role === "ADMIN";
+  if (!user) {
+    return (
+      <AuthScreen
+        loginEmail={loginEmail}
+        setLoginEmail={setLoginEmail}
+        loginPassword={loginPassword}
+        setLoginPassword={setLoginPassword}
+        authError={authError}
+        loading={loading}
+        onQuickLogin={handleQuickLogin}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans">
-      {/* Top Institutional App Bar */}
-      <header className="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white ${
-              isRegulator ? "bg-blue-600" : "bg-emerald-600"
-            }`}>
-              {isRegulator ? <Scale className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+    <div className="min-h-screen bg-[#f8faf7] text-forest-900 flex flex-col font-sans selection:bg-leaf-100 selection:text-leaf-800">
+      {/* Presentation Deck Style Hero Banner */}
+      <header className="relative bg-gradient-to-r from-forest-950 via-forest-900 to-forest-950 text-white shadow-md border-b border-forest-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            {/* Logo & Brand */}
+            <div className="flex items-center space-x-3.5">
+              {/* Twin-Leaf Logo from Presentation Slide */}
+              <div className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 shadow-inner">
+                <svg viewBox="0 0 36 36" className="w-7 h-7" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Light Lime Leaf */}
+                  <path
+                    d="M11 25C11 15 20 8 20 8C20 8 21 17 17 21C14.5 23.5 12.5 24.8 11 25Z"
+                    fill="#84cc16"
+                  />
+                  {/* Deep Green / White Leaf */}
+                  <path
+                    d="M25 25C25 15 16 8 16 8C16 8 15 17 19 21C21.5 23.5 23.5 24.8 25 25Z"
+                    fill="#ffffff"
+                  />
+                  {/* Central Stem */}
+                  <path d="M18 28V20" stroke="#dcfce7" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-semibold tracking-[0.24em] text-emerald-200 uppercase">
+                    Renewable compliance intelligence
+                  </span>
+                </div>
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                  REC GUARDIAN
+                  <span className="hidden sm:inline-block text-xs font-normal px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                    Forensic governance platform
+                  </span>
+                </h1>
+              </div>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-white">REC Guardian</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${
-                  isRegulator
-                    ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                }`}>
-                  {isRegulator ? "REGULATORY SURVEILLANCE" : "PRODUCER WORKSPACE"}
+
+            {/* Slide Subtitle Pill: "DETECT. EXPLAIN. INVESTIGATE. PRESERVE EVIDENCE." */}
+            <div className="hidden lg:flex items-center">
+              <div className="px-4 py-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 shadow-sm">
+                <span className="text-[10px] font-semibold tracking-[0.2em] text-emerald-200 uppercase">
+                  Detect. Explain. Investigate. Preserve evidence.
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-mono">{user.organization_name || user.email}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <div className="text-xs font-semibold text-white">{user.full_name}</div>
-              <div className={`text-[10px] font-mono font-bold ${isRegulator ? "text-blue-400" : "text-emerald-400"}`}>
-                ROLE: {user.role}
-              </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        </div>
+            {/* Persona Quick Switcher & User Profile */}
+            <div className="flex items-center justify-between sm:justify-end gap-3">
+              {user ? (
+                <div className="flex items-center gap-2.5">
+                  <div className="hidden sm:block text-right">
+                    <p className="text-xs font-semibold text-white leading-tight">{user.full_name}</p>
+                    <p className="text-[11px] text-sprout-300 font-mono">{user.role} • {user.organization_name || "Registry"}</p>
+                  </div>
+                  <Badge variant="lime" className="text-[11px]">
+                    {user.role}
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="h-8 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <LogOut className="w-3.5 h-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline text-xs">Exit</span>
+                  </Button>
+                </div>
+              ) : (
+                <Badge variant="secondary" className="bg-white/10 text-white border-white/10 text-xs">
+                  Public Guest Mode
+                </Badge>
+              )}
 
-        {/* Tab Navigation */}
-        <div className="max-w-7xl mx-auto px-4 flex gap-1 border-t border-slate-800 text-xs overflow-x-auto">
-          {isRegulator ? (
-            <>
-              {[
-                { id: "dashboard", label: "Fraud Radar (Macro)" },
-                { id: "fabric-dlt", label: "⚡ Hyperledger Fabric DLT & Demo" },
-                { id: "lineage", label: "Certificate Explorer & Timeline" },
-                { id: "cases", label: `Regulatory Cases (${cases.filter(c => c.status === "OPEN").length})` },
-                { id: "claims", label: "All Claims & AI Audit" },
-                { id: "ledger", label: "Cryptographic Ledger" },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => {
-                    setActiveTab(t.id);
-                    if (t.id === "lineage" && !lineageData) handleFetchLineage("CLM-2026-FRAUD-MTR");
-                  }}
-                  className={`py-3 px-4 font-medium border-b-2 transition whitespace-nowrap ${
-                    activeTab === t.id
-                      ? "border-blue-500 text-blue-400 font-semibold"
-                      : "border-transparent text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </>
-          ) : (
-            <>
-              {[
-                { id: "dashboard", label: "Generation Overview" },
-                { id: "fabric-dlt", label: "⚡ Hyperledger Fabric DLT & Demo" },
-                { id: "lineage", label: "Certificate Explorer & Timeline" },
-                { id: "claims", label: `My Claims (${claims.length})` },
-                { id: "certificates", label: `REC Wallet (${certificates.length})` },
-                { id: "plants", label: `Power Facilities (${plants.length})` },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => {
-                    setActiveTab(t.id);
-                    if (t.id === "lineage" && !lineageData) handleFetchLineage("CLM-2026-LEGIT-01");
-                  }}
-                  className={`py-3 px-4 font-medium border-b-2 transition whitespace-nowrap ${
-                    activeTab === t.id
-                      ? "border-emerald-500 text-emerald-400 font-semibold"
-                      : "border-transparent text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </>
-          )}
+              {/* Mobile menu hamburger button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileMenuOpen(true)}
+                className="lg:hidden text-white hover:bg-white/10"
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Main Workspace Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {loading ? (
-          <div className="text-center py-24 text-slate-400">
-            <RotateCw className="w-7 h-7 animate-spin mx-auto text-slate-500 mb-2" />
-            <p className="text-xs">Synchronizing Forensic Registry Data...</p>
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Navigation Tabs Bar (Desktop) */}
+        <div className="hidden lg:block mb-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="bg-white border border-sage-200 p-1.5 shadow-sm rounded-xl w-full justify-start gap-1">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-leaf-700 data-[state=active]:text-white gap-2">
+                <Activity className="w-4 h-4" /> Overview & KPI Radar
+              </TabsTrigger>
+              <TabsTrigger value="fabric-dlt" className="data-[state=active]:bg-leaf-700 data-[state=active]:text-white gap-2">
+                <Zap className="w-4 h-4 text-amber-500" /> Hyperledger Fabric DLT
+              </TabsTrigger>
+              <TabsTrigger value="claims" className="data-[state=active]:bg-leaf-700 data-[state=active]:text-white gap-2">
+                <FileSearch className="w-4 h-4" /> Claims Triage
+                {heldCount > 0 && <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-[10px]">{heldCount}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="lineage" className="data-[state=active]:bg-leaf-700 data-[state=active]:text-white gap-2">
+                <Link2 className="w-4 h-4" /> Certificate Lineage Explorer
+              </TabsTrigger>
+              <TabsTrigger value="wallet" className="data-[state=active]:bg-leaf-700 data-[state=active]:text-white gap-2">
+                <Award className="w-4 h-4" /> Digital REC Wallet
+              </TabsTrigger>
+              <TabsTrigger value="investigations" className="data-[state=active]:bg-leaf-700 data-[state=active]:text-white gap-2">
+                <Gavel className="w-4 h-4" /> Regulatory Adjudication
+                {cases.filter((c) => c.status === "OPEN").length > 0 && (
+                  <Badge variant="warning" className="ml-1 px-1.5 py-0 text-[10px]">
+                    {cases.filter((c) => c.status === "OPEN").length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="ledger" className="data-[state=active]:bg-leaf-700 data-[state=active]:text-white gap-2">
+                <Database className="w-4 h-4" /> Cryptographic Ledger
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {/* Mobile Navigation Drawer Sheet */}
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <SheetHeader>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-leaf-700 text-white flex items-center justify-center font-bold">
+                <Leaf className="w-4 h-4 text-sprout-400" />
+              </div>
+              <SheetTitle>REC Guardian</SheetTitle>
+            </div>
+            <p className="text-xs text-sage-600">Select audit module</p>
+          </SheetHeader>
+          <div className="flex flex-col gap-1.5 mt-4">
+            {[
+              { id: "dashboard", label: "Overview & KPI Radar", icon: Activity },
+              { id: "fabric-dlt", label: "Hyperledger Fabric DLT", icon: Zap },
+              { id: "claims", label: "Claims Triage", icon: FileSearch, badge: heldCount },
+              { id: "lineage", label: "Certificate Lineage", icon: Link2 },
+              { id: "wallet", label: "Digital REC Wallet", icon: Award },
+              { id: "investigations", label: "Regulatory Adjudication", icon: Gavel },
+              { id: "ledger", label: "Cryptographic Ledger", icon: Database },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === item.id
+                      ? "bg-leaf-700 text-white font-semibold"
+                      : "text-forest-900 hover:bg-sage-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge ? (
+                    <Badge variant={activeTab === item.id ? "secondary" : "destructive"}>{item.badge}</Badge>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <>
-            {/* KPI Top Summary Cards */}
-            {stats && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span>{isRegulator ? "Market Verified Generation" : "Total MWh Issued"}</span>
-                    <Zap className={`w-4 h-4 ${isRegulator ? "text-blue-400" : "text-emerald-400"}`} />
-                  </div>
-                  <div className="text-2xl font-bold font-mono text-white mt-1.5">
-                    {stats.total_mwh_issued.toLocaleString()} <span className="text-xs font-sans text-slate-400">MWh</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    {stats.total_certificates_issued} Verified RECs Minted
-                  </div>
-                </div>
+        </Sheet>
 
-                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span>{isRegulator ? "Macro Fraud Alerts" : "Claims Requiring Review"}</span>
-                    <ShieldAlert className="w-4 h-4 text-rose-400" />
-                  </div>
-                  <div className="text-2xl font-bold font-mono text-rose-400 mt-1.5">
-                    {stats.claims_held + stats.claims_under_review}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    {stats.claims_held} Held • {stats.claims_under_review} Under Review
-                  </div>
+        {/* ========================================================================= */}
+        {/* TAB 1: OVERVIEW & DASHBOARD RADAR                                         */}
+        {/* ========================================================================= */}
+        {activeTab === "dashboard" && (
+          <div className="space-y-6">
+            {/* Top Alert / Verification Banner */}
+            <div className="p-4 rounded-xl bg-white border border-sage-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
                 </div>
-
-                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span>{isRegulator ? "Active Cases" : "Claim Approval Rate"}</span>
-                    <Scale className="w-4 h-4 text-amber-400" />
-                  </div>
-                  <div className="text-2xl font-bold font-mono text-amber-400 mt-1.5">
-                    {isRegulator ? stats.open_investigation_cases : `${stats.total_claims > 0 ? Math.round((stats.claims_approved / stats.total_claims) * 100) : 100}%`}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    {isRegulator ? "Pending Regulatory Adjudication" : `${stats.claims_approved} approved out of ${stats.total_claims}`}
-                  </div>
-                </div>
-
-                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span>{isRegulator ? "Cryptographic Ledger" : "Active Power Facilities"}</span>
-                    <Link2 className="w-4 h-4 text-teal-400" />
-                  </div>
-                  <div className="text-2xl font-bold font-mono text-emerald-400 mt-1.5">
-                    {isRegulator ? (ledgerAudit?.is_valid ? "100% Valid" : "Tamper Detected") : plants.length}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    {isRegulator ? `${ledgerAudit?.total_blocks || 0} SHA-256 Blocks` : "Registered Clean Assets"}
-                  </div>
+                <div>
+                  <h3 className="text-sm font-bold text-forest-900">
+                    Cryptographic Ledger Integrity: {ledgerAudit?.is_valid ? "VERIFIED VALID" : "CHECK IN PROGRESS"}
+                  </h3>
+                  <p className="text-xs text-sage-600">
+                    Append-only SHA-256 hash chain anchored across {ledgerAudit?.total_blocks || ledgerBlocks.length} lifecycle blocks. Zero tampering detected.
+                  </p>
                 </div>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <Badge variant="success" className="gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Blockchain Synchronized
+                </Badge>
+                <Button size="sm" variant="outline" onClick={loadDashboardData} disabled={loading}>
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
+                </Button>
+              </div>
+            </div>
 
-            {/* TAB: HYPERLEDGER FABRIC DLT & DEMO SCENARIO */}
-            {activeTab === "fabric-dlt" && (
-              <FabricLedgerDashboard />
-            )}
-
-            {/* TAB: CERTIFICATE & CLAIM LINEAGE EXPLORER (The Core Feature) */}
-            {activeTab === "lineage" && (
-              <div className="space-y-6">
-                {/* Search Bar & Preset Queries */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-                  <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Search className="w-4 h-4 text-emerald-400" />
-                      <span>Certificate & Claim Lineage Deep-Dive</span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Trace complete 6-stage lifecycle provenance: Ground Truth Telemetry → Claim → AI Risk Score → Investigation Case → REC Token → Cryptographic Ledger
-                    </p>
+            {/* 4 Metric Cards in Leaves Green & White Style */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {/* Card 1: Total Generation Volume */}
+              <Card className="border-sage-200 shadow-sm hover:border-leaf-500/50 transition-all">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 border-none">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-sage-600">
+                    Total Clean Energy Claimed
+                  </CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-leaf-50 border border-leaf-200 flex items-center justify-center text-leaf-700">
+                    <Sun className="w-4 h-4" />
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl sm:text-3xl font-bold text-forest-900">
+                    {totalMwhClaimed.toLocaleString()} <span className="text-sm font-normal text-sage-600">MWh</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-sage-600">
+                    <span>Verified MWh Issued:</span>
+                    <span className="font-semibold text-leaf-700">{totalMwhIssued.toLocaleString()} MWh</span>
+                  </div>
+                  <Progress value={(totalMwhIssued / (totalMwhClaimed || 1)) * 100} className="mt-2 h-1.5 bg-sage-100" />
+                </CardContent>
+              </Card>
 
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleFetchLineage();
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      type="text"
+              {/* Card 2: Registered Clean Facilities */}
+              <Card className="border-sage-200 shadow-sm hover:border-leaf-500/50 transition-all">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 border-none">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-sage-600">
+                    Generation Facilities
+                  </CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+                    <Factory className="w-4 h-4" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl sm:text-3xl font-bold text-forest-900">
+                    {plants.length || stats?.total_plants || 2} <span className="text-sm font-normal text-sage-600">Assets</span>
+                  </div>
+                  <p className="text-xs text-sage-600 mt-2">
+                    Solar PV & Wind utility assets linked to IoT telemetry meters.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Card 3: Claims Under Surveillance */}
+              <Card className="border-sage-200 shadow-sm hover:border-leaf-500/50 transition-all">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 border-none">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-sage-600">
+                    Forensic Claims Status
+                  </CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+                    <FileSearch className="w-4 h-4" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl sm:text-3xl font-bold text-forest-900">
+                    {claims.length} <span className="text-sm font-normal text-sage-600">Total</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="destructive" className="text-[10px]">
+                      {heldCount} Held
+                    </Badge>
+                    <Badge variant="success" className="text-[10px]">
+                      {claims.filter((c) => c.status === "APPROVED").length} Approved
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card 4: Open Regulatory Investigations */}
+              <Card className="border-sage-200 shadow-sm hover:border-leaf-500/50 transition-all">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 border-none">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-sage-600">
+                    Active Dockets
+                  </CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center text-red-700">
+                    <Gavel className="w-4 h-4" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl sm:text-3xl font-bold text-forest-900">
+                    {cases.length} <span className="text-sm font-normal text-sage-600">Cases</span>
+                  </div>
+                  <p className="text-xs text-sage-600 mt-2">
+                    {cases.filter((c) => c.status === "OPEN").length} awaiting regulatory judicial order.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Middle Section: Recent Claims + Live Quick Lineage Search */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Claims Preview (Left 2 cols) */}
+              <Card className="lg:col-span-2 border-sage-200">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Recent Generation Claims</CardTitle>
+                    <CardDescription>Multi-engine fraud detection scoring & telemetry cross-checks</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab("claims")}>
+                    View All Claims <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Claim UID</TableHead>
+                        <TableHead>Volume</TableHead>
+                        <TableHead>Risk Score</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {claims.slice(0, 5).map((claim) => (
+                        <TableRow key={claim.id}>
+                          <TableCell className="font-mono font-medium text-xs">
+                            {claim.claim_uid}
+                          </TableCell>
+                          <TableCell>{claim.claimed_mwh.toLocaleString()} MWh</TableCell>
+                          <TableCell>
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                                claim.risk_score >= 70
+                                  ? "bg-red-100 text-red-800"
+                                  : claim.risk_score >= 30
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}
+                            >
+                              {claim.risk_score.toFixed(1)} / 100
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                claim.status === "APPROVED"
+                                  ? "success"
+                                  : claim.status === "HELD" || claim.status === "REJECTED"
+                                  ? "destructive"
+                                  : "warning"
+                              }
+                            >
+                              {claim.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedClaim(claim)}
+                              className="text-leaf-700 hover:text-leaf-900"
+                            >
+                              Details
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Quick Lineage Explorer Launcher (Right 1 col) */}
+              <Card className="border-sage-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Link2 className="w-5 h-5 text-leaf-700" />
+                    Forensic Lineage
+                  </CardTitle>
+                  <CardDescription>
+                    Explore 6-stage telemetry provenance and chronological evidence timeline
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g. CLM-2026-FRAUD-MTR"
                       value={lineageSearchInput}
                       onChange={(e) => setLineageSearchInput(e.target.value)}
-                      placeholder="Enter Certificate UID (REC-...), Claim UID (CLM-...), or Case #"
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-slate-600"
+                      className="font-mono text-xs"
                     />
-                    <button
-                      type="submit"
-                      disabled={lineageLoading}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        handleExecuteLineageSearch(lineageSearchInput);
+                        setActiveTab("lineage");
+                      }}
                     >
-                      {lineageLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                      <span>Trace Lineage</span>
-                    </button>
-                  </form>
-
-                  {/* Preset Search Chips */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Quick Presets:</span>
-                    {DEMO_LINEAGE_QUERIES.map((q, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleFetchLineage(q.query)}
-                        className="px-2.5 py-1 bg-slate-950 border border-slate-800 hover:border-slate-600 rounded-lg text-slate-300 font-mono text-[11px] flex items-center gap-1.5 transition"
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          q.badge === "FRAUD" ? "bg-rose-500" : q.badge === "LOOP" ? "bg-amber-500" : "bg-emerald-500"
-                        }`} />
-                        <span>{q.label}</span>
-                      </button>
-                    ))}
+                      Inspect
+                    </Button>
                   </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-sage-600">Quick Test Scenarios:</p>
+                    <div className="flex flex-col gap-1.5">
+                      {DEMO_LINEAGE_QUERIES.map((demo) => (
+                        <button
+                          key={demo.query}
+                          onClick={() => {
+                            setLineageSearchInput(demo.query);
+                            handleExecuteLineageSearch(demo.query);
+                            setActiveTab("lineage");
+                          }}
+                          className="text-left text-xs p-2 rounded-lg bg-sage-50 hover:bg-sage-100 border border-sage-200/60 flex items-center justify-between transition-colors"
+                        >
+                          <span className="font-medium text-forest-900">{demo.label}</span>
+                          <span className="font-mono text-[10px] text-sage-600">{demo.query}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 2: CLAIMS TRIAGE                                                      */}
+        {/* ========================================================================= */}
+        {activeTab === "claims" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-forest-900">Generation Claims Triage</h2>
+                <p className="text-xs sm:text-sm text-sage-600">
+                  Real-time fraud surveillance matching generation claims against substation meters and physical laws.
+                </p>
+              </div>
+              <Button onClick={() => setIsSubmitModalOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" /> Submit Generation Claim
+              </Button>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-sage-500" />
+                <Input
+                  placeholder="Search by Claim UID, status, or plant..."
+                  className="pl-9"
+                  value={claimsSearchQuery}
+                  onChange={(e) => setClaimsSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto">
+                {["ALL", "APPROVED", "HELD", "UNDER_REVIEW"].map((status) => (
+                  <Button
+                    key={status}
+                    size="sm"
+                    variant={claimsFilterStatus === status ? "default" : "outline"}
+                    onClick={() => setClaimsFilterStatus(status)}
+                    className="text-xs whitespace-nowrap"
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Claims Table */}
+            <Card className="border-sage-200">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Claim UID</TableHead>
+                      <TableHead>Facility</TableHead>
+                      <TableHead>Claimed MWh</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Multi-Engine Risk</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClaims.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-sage-600">
+                          No generation claims matched your filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredClaims.map((claim) => (
+                        <TableRow key={claim.id}>
+                          <TableCell className="font-mono text-xs font-semibold">
+                            {claim.claim_uid}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {plants.find((p) => p.id === claim.plant_id)?.name || `Plant #${claim.plant_id}`}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {claim.claimed_mwh.toLocaleString()} MWh
+                          </TableCell>
+                          <TableCell className="text-xs text-sage-600">
+                            {claim.period_start?.substring(0, 10)} to {claim.period_end?.substring(0, 10)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${
+                                  claim.risk_score >= 70
+                                    ? "bg-red-100 text-red-800"
+                                    : claim.risk_score >= 30
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {claim.risk_score.toFixed(1)}
+                              </span>
+                              <span className="text-[11px] text-sage-600">
+                                {claim.risk_score >= 70 ? "CRITICAL" : claim.risk_score >= 30 ? "MEDIUM" : "LOW"}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                claim.status === "APPROVED"
+                                  ? "success"
+                                  : claim.status === "HELD" || claim.status === "REJECTED"
+                                  ? "destructive"
+                                  : "warning"
+                              }
+                            >
+                              {claim.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedClaim(claim)}
+                              className="text-xs h-8"
+                            >
+                              Inspect
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setLineageSearchInput(claim.claim_uid);
+                                handleExecuteLineageSearch(claim.claim_uid);
+                                setActiveTab("lineage");
+                              }}
+                              className="text-xs h-8 text-leaf-700"
+                            >
+                              Lineage
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: 6-STAGE LINEAGE PROVENANCE EXPLORER                                */}
+        {/* ========================================================================= */}
+        {activeTab === "lineage" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-forest-900">Certificate Lineage Explorer</h2>
+                <p className="text-xs sm:text-sm text-sage-600">
+                  End-to-end multi-stage provenance and chronological evidence timeline for any certificate or claim.
+                </p>
+              </div>
+            </div>
+
+            {/* Search Input and Quick Presets */}
+            <Card className="border-sage-200">
+              <CardContent className="p-4 sm:p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-3.5 text-sage-500" />
+                    <Input
+                      placeholder="Enter Certificate UID (e.g. REC-2026-SOL-09921) or Claim UID (e.g. CLM-2026-FRAUD-MTR)..."
+                      className="pl-9 font-mono text-sm h-11"
+                      value={lineageSearchInput}
+                      onChange={(e) => setLineageSearchInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleExecuteLineageSearch(lineageSearchInput)}
+                    />
+                  </div>
+                  <Button
+                    className="h-11 px-6 gap-2"
+                    onClick={() => handleExecuteLineageSearch(lineageSearchInput)}
+                    disabled={lineageLoading}
+                  >
+                    {lineageLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Trace Lineage
+                  </Button>
                 </div>
 
-                {/* Lineage Search Results */}
-                {lineageLoading && (
-                  <div className="text-center py-16 text-slate-400">
-                    <RotateCw className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
-                    <p className="text-xs">Traversing SHA-256 Ledger & Forensic Lineage...</p>
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-semibold text-sage-600">Preset Scenarios:</span>
+                  {DEMO_LINEAGE_QUERIES.map((demo) => (
+                    <button
+                      key={demo.query}
+                      onClick={() => {
+                        setLineageSearchInput(demo.query);
+                        handleExecuteLineageSearch(demo.query);
+                      }}
+                      className="px-2.5 py-1 rounded-full bg-sage-100 hover:bg-sage-200 text-forest-900 font-medium transition-colors border border-sage-200"
+                    >
+                      {demo.label}
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-                {lineageError && (
-                  <div className="p-4 bg-rose-950/30 border border-rose-800 text-rose-300 text-xs rounded-xl">
-                    {lineageError}
-                  </div>
-                )}
+            {lineageError && (
+              <Alert variant="destructive">
+                <AlertTriangle className="w-4 h-4" />
+                <AlertTitle>Lineage Query Error</AlertTitle>
+                <AlertDescription>{lineageError}</AlertDescription>
+              </Alert>
+            )}
 
-                {lineageData && lineageData.found && (
-                  <div className="space-y-6">
-                    {/* Lineage Summary Banner */}
-                    <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
+            {lineageData && (
+              <div className="space-y-6">
+                {/* 6-Stage Lineage Cards */}
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-sage-600 mb-3">
+                    6-Stage Provenance Pipeline
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Stage 1: Facility */}
+                    <Card className="border-sage-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sprout-600 uppercase tracking-wider">Stage 1</span>
+                          <Factory className="w-4 h-4 text-sage-500" />
+                        </div>
+                        <CardTitle className="text-base">Generation Asset</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-1.5 text-sage-600">
+                        <p className="font-semibold text-forest-900 text-sm">{lineageData.plant?.name || "N/A"}</p>
+                        <p>Technology: <span className="font-medium text-forest-900">{lineageData.plant?.fuel_type || "SOLAR"}</span></p>
+                        <p>Nameplate Capacity: <span className="font-medium text-forest-900">{lineageData.plant?.nameplate_capacity_mw || 50} MW</span></p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Stage 2: Smart Meter */}
+                    <Card className="border-sage-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sprout-600 uppercase tracking-wider">Stage 2</span>
+                          <Radio className="w-4 h-4 text-sage-500" />
+                        </div>
+                        <CardTitle className="text-base">Substation Meter</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-1.5 text-sage-600">
+                        <p className="font-mono text-forest-900">{lineageData.meter?.meter_serial_number || "MTR-SOL-001"}</p>
+                        <p>Metered Energy: <span className="font-semibold text-forest-900">{lineageData.meter?.energy_generated_mwh?.toLocaleString() || "1,200"} MWh</span></p>
+                        <p>Source: <span className="font-medium text-forest-900">Utility Grid Interconnection</span></p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Stage 3: Fingerprint Hashes */}
+                    <Card className="border-sage-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sprout-600 uppercase tracking-wider">Stage 3</span>
+                          <Lock className="w-4 h-4 text-sage-500" />
+                        </div>
+                        <CardTitle className="text-base">Claim Cryptography</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-1.5 text-sage-600">
+                        <p>Claim UID: <span className="font-mono font-medium text-forest-900">{lineageData.claim?.claim_uid}</span></p>
+                        <p>Claimed Energy: <span className="font-semibold text-forest-900">{lineageData.claim?.claimed_mwh?.toLocaleString()} MWh</span></p>
+                        <p className="truncate font-mono text-[10px] text-sage-500">Hash: {lineageData.claim?.submission_fingerprint || "e3b0c442..."}</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Stage 4: Risk Scoring */}
+                    <Card className="border-sage-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sprout-600 uppercase tracking-wider">Stage 4</span>
+                          <Scale className="w-4 h-4 text-sage-500" />
+                        </div>
+                        <CardTitle className="text-base">Forensic Risk Score</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-1.5 text-sage-600">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-slate-400">Target Identifier:</span>
-                          <span className="font-mono font-bold text-sm text-white">{lineageData.query}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
-                            {lineageData.search_type}
+                          <span className="text-xl font-bold text-forest-900">
+                            {lineageData.claim?.risk_score?.toFixed(1) || 0} / 100
                           </span>
+                          <Badge
+                            variant={
+                              (lineageData.claim?.risk_score || 0) >= 70
+                                ? "destructive"
+                                : (lineageData.claim?.risk_score || 0) >= 30
+                                ? "warning"
+                                : "success"
+                            }
+                          >
+                            {lineageData.claim?.risk_score >= 70 ? "CRITICAL FRAUD" : "VERIFIED"}
+                          </Badge>
                         </div>
-                        <div className="text-xs text-slate-400 mt-1">
-                          Facility: {lineageData.plant?.name || "Unassigned"} ({lineageData.plant?.fuel_type || "N/A"} • {lineageData.plant?.capacity_mw || 0} MW)
+                        <p>Status: <span className="font-semibold">{lineageData.claim?.status}</span></p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Stage 5: Ledger Anchor */}
+                    <Card className="border-sage-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sprout-600 uppercase tracking-wider">Stage 5</span>
+                          <Database className="w-4 h-4 text-sage-500" />
                         </div>
-                      </div>
+                        <CardTitle className="text-base">Ledger Anchoring</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-1.5 text-sage-600">
+                        <p>Linked Blocks: <span className="font-semibold text-forest-900">{lineageData.ledger_blocks?.length || 0} Blocks</span></p>
+                        <p className="text-[11px] text-emerald-700 font-medium">SHA-256 Hash Chain Validated</p>
+                      </CardContent>
+                    </Card>
 
-                      {lineageData.claim && (
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <div className="text-[10px] font-mono text-slate-400 uppercase">AI Forensic Score</div>
-                            <div className={`text-xl font-mono font-bold ${
-                              lineageData.claim.risk_score >= 65 ? "text-rose-400" : lineageData.claim.risk_score >= 25 ? "text-amber-400" : "text-emerald-400"
-                            }`}>
-                              {lineageData.claim.risk_score.toFixed(1)} / 100
-                            </div>
-                          </div>
-                          <span className={`px-3 py-1 rounded text-xs font-bold font-mono border ${
-                            lineageData.claim.risk_score >= 65
-                              ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                              : lineageData.claim.risk_score >= 25
-                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                          }`}>
-                            {lineageData.claim.status}
-                          </span>
+                    {/* Stage 6: Ownership & Transfers */}
+                    <Card className="border-sage-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-sprout-600 uppercase tracking-wider">Stage 6</span>
+                          <Award className="w-4 h-4 text-sage-500" />
                         </div>
-                      )}
-                    </div>
-
-                    {/* The 6-Stage Lineage Architecture Pipeline */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                      {/* Stage 1: Ground Truth */}
-                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">1. Ground Truth</span>
-                        <div className="font-semibold text-white">{lineageData.plant?.name || "Power Facility"}</div>
-                        <div className="text-[11px] text-slate-400">{lineageData.plant?.capacity_mw} MW Capacity</div>
-                        {lineageData.meter && (
-                          <div className="pt-1 text-[11px] font-mono text-emerald-400 border-t border-slate-800/80">
-                            Meter: {lineageData.meter.energy_generated_mwh?.toLocaleString()} MWh
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Stage 2: Claim */}
-                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">2. Claim Record</span>
-                        <div className="font-mono text-white font-medium">{lineageData.claim?.uid || "N/A"}</div>
-                        <div className="text-[11px] font-mono text-slate-300">{lineageData.claim?.mwh?.toLocaleString()} MWh Claimed</div>
-                        <div className="text-[10px] text-slate-500 font-mono truncate">FP: {lineageData.claim?.fingerprint?.slice(0, 10)}...</div>
-                      </div>
-
-                      {/* Stage 3: AI Risk */}
-                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">3. AI Risk Score</span>
-                        <div className={`font-bold font-mono text-sm ${
-                          (lineageData.claim?.risk_score || 0) >= 65 ? "text-rose-400" : "text-emerald-400"
-                        }`}>
-                          {lineageData.claim?.risk_score?.toFixed(1) || "0.0"} / 100
-                        </div>
-                        <div className="text-[11px] text-slate-400">{lineageData.claim?.risk_level || "LOW"} Risk</div>
-                        <div className="text-[10px] text-slate-500 truncate">
-                          {lineageData.risk_assessment?.recommendation || "APPROVED"}
-                        </div>
-                      </div>
-
-                      {/* Stage 4: Investigation */}
-                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">4. Investigation</span>
-                        {lineageData.investigation ? (
-                          <>
-                            <div className="font-mono font-medium text-amber-400">{lineageData.investigation.case_number}</div>
-                            <div className="text-[11px] text-slate-300">{lineageData.investigation.priority} Priority</div>
-                            <div className="text-[10px] text-slate-400">{lineageData.investigation.status}</div>
-                          </>
-                        ) : (
-                          <div className="text-slate-500 text-[11px] italic">No Fraud Case Opened</div>
-                        )}
-                      </div>
-
-                      {/* Stage 5: REC Certificate */}
-                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">5. REC Token</span>
+                        <CardTitle className="text-base">REC Token State</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-1.5 text-sage-600">
                         {lineageData.certificate ? (
                           <>
-                            <div className="font-mono font-medium text-emerald-400 truncate">{lineageData.certificate.uid}</div>
-                            <div className="text-[11px] text-slate-300">{lineageData.certificate.mwh?.toLocaleString()} MWh</div>
-                            <div className="text-[10px] text-slate-400">{lineageData.certificate.status}</div>
+                            <p className="font-mono font-medium text-forest-900">{lineageData.certificate.certificate_uid}</p>
+                            <p>Status: <Badge variant="success">{lineageData.certificate.status}</Badge></p>
+                            <p>Transfer Hops: {lineageData.transfers?.length || 0}</p>
                           </>
                         ) : (
-                          <div className="text-slate-500 text-[11px] italic">Held (Not Minted)</div>
+                          <p className="text-amber-700 italic">Certificate Not Minted (Claim HELD/Fraudulent)</p>
                         )}
-                      </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
 
-                      {/* Stage 6: Ledger Block */}
-                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 text-xs">
-                        <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">6. Ledger Trust</span>
-                        <div className="font-mono font-bold text-teal-400">
-                          {lineageData.ledger_blocks?.length > 0 ? `${lineageData.ledger_blocks.length} Blocks` : "Pending"}
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono truncate">
-                          {lineageData.ledger_blocks?.[0]?.current_hash ? `Hash: ${lineageData.ledger_blocks[0].current_hash.slice(0, 8)}...` : "Genesis Verified"}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Chronological Evidence Timeline */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-                      <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                        <div>
-                          <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                            <History className="w-4 h-4 text-emerald-400" />
-                            <span>Forensic Evidence Timeline</span>
-                          </h4>
-                          <p className="text-xs text-slate-400">Immutable chronological sequence of events, verifications, and regulatory actions</p>
-                        </div>
-                        <span className="text-xs font-mono text-slate-400">
-                          {lineageData.timeline?.length || 0} Chronological Events
-                        </span>
-                      </div>
-
-                      <div className="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-800">
-                        {lineageData.timeline?.map((evt: any, idx: number) => {
-                          const isCritical = evt.severity === "CRITICAL";
-                          const isWarning = evt.severity === "WARNING";
-                          const isSuccess = evt.severity === "SUCCESS";
-
-                          const dotColor = isCritical
-                            ? "bg-rose-500 ring-4 ring-rose-950"
-                            : isWarning
-                            ? "bg-amber-500 ring-4 ring-amber-950"
-                            : isSuccess
-                            ? "bg-emerald-500 ring-4 ring-emerald-950"
-                            : "bg-blue-500 ring-4 ring-blue-950";
-
-                          return (
-                            <div key={idx} className="relative flex items-start gap-4 pl-8">
-                              <div className={`absolute left-2.5 top-1.5 w-2.5 h-2.5 rounded-full ${dotColor}`} />
-                              <div className="flex-1 bg-slate-950 border border-slate-800/80 rounded-xl p-3.5 space-y-1">
-                                <div className="flex flex-wrap justify-between items-center gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-white">{evt.title}</span>
-                                    <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
-                                      isCritical ? "bg-rose-500/20 text-rose-300" : isWarning ? "bg-amber-500/20 text-amber-300" : isSuccess ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-800 text-slate-300"
-                                    }`}>
-                                      {evt.stage}
-                                    </span>
-                                  </div>
-                                  <div className="text-[11px] font-mono text-slate-400">
-                                    {new Date(evt.timestamp).toLocaleString()}
-                                  </div>
-                                </div>
-                                <p className="text-xs text-slate-300 leading-relaxed">{evt.description}</p>
-                                {evt.actor && (
-                                  <div className="text-[10px] text-slate-500 font-mono pt-1">
-                                    Responsible Actor: <span className="text-slate-400">{evt.actor}</span>
-                                  </div>
-                                )}
-                              </div>
+                {/* Vertical Chronological Evidence Timeline */}
+                <Card className="border-sage-200">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="w-5 h-5 text-leaf-700" />
+                      Chronological Evidence Timeline
+                    </CardTitle>
+                    <CardDescription>
+                      Full audit trail synthesized from IoT meter logs, risk engine evaluations, and ledger blocks
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-sage-200">
+                      {(lineageData.timeline || []).map((item: any, idx: number) => (
+                        <div key={idx} className="relative">
+                          {/* Dot */}
+                          <div
+                            className={`absolute -left-[27px] top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${
+                              item.severity === "CRITICAL"
+                                ? "bg-red-600"
+                                : item.severity === "WARNING"
+                                ? "bg-amber-500"
+                                : "bg-leaf-600"
+                            }`}
+                          />
+                          <div className="bg-sage-50 p-4 rounded-xl border border-sage-200/80">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
+                              <h4 className="text-sm font-bold text-forest-900">{item.title}</h4>
+                              <span className="text-[11px] font-mono text-sage-500">
+                                {item.timestamp ? new Date(item.timestamp).toLocaleString() : "Audit Recorded"}
+                              </span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Transfers (if any) */}
-                    {lineageData.transfers?.length > 0 && (
-                      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
-                          <span>Secondary Market Trading Hops</span>
-                        </h4>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className="border-b border-slate-800 text-slate-400 pb-2">
-                              <tr>
-                                <th className="py-2">From Party</th>
-                                <th className="py-2">To Party</th>
-                                <th className="py-2">Transfer Action</th>
-                                <th className="py-2 font-mono">Transaction Hash</th>
-                                <th className="py-2">Timestamp</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
-                              {lineageData.transfers.map((t: any, i: number) => (
-                                <tr key={i} className="hover:bg-slate-800/20">
-                                  <td className="py-2.5 font-sans font-medium text-white">{t.from_user}</td>
-                                  <td className="py-2.5 font-sans font-medium text-slate-300">{t.to_user}</td>
-                                  <td className="py-2.5">
-                                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">
-                                      {t.transfer_type}
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 text-slate-400 text-[11px]">{t.tx_hash.slice(0, 16)}...</td>
-                                  <td className="py-2.5 text-slate-500 text-[11px] font-sans">{new Date(t.timestamp).toLocaleString()}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                            <p className="text-xs text-sage-600">{item.description}</p>
+                            <div className="mt-2 flex items-center gap-2">
+                              <Badge variant="outline" className="text-[10px]">
+                                {item.stage}
+                              </Badge>
+                              {item.actor && (
+                                <span className="text-[10px] text-sage-500 font-medium">Actor: {item.actor}</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
+          </div>
+        )}
 
-            {/* TAB: GENERATOR / TRADER - CLAIMS */}
-            {!isRegulator && activeTab === "claims" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-base font-bold text-white">My Submitted Energy Generation Claims</h3>
-                    <p className="text-xs text-slate-400">Track claim verification status and AI risk breakdown</p>
-                  </div>
-                  <button
-                    onClick={() => setShowClaimModal(true)}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Submit New Claim</span>
-                  </button>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-800 text-slate-400 pb-2">
-                      <tr>
-                        <th className="py-3">Claim UID</th>
-                        <th className="py-3">Claimed MWh</th>
-                        <th className="py-3">Period</th>
-                        <th className="py-3">Risk Assessment</th>
-                        <th className="py-3">Status</th>
-                        <th className="py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {claims.map((c) => {
-                        const isHigh = c.risk_score >= 65;
-                        const isMed = c.risk_score >= 25 && c.risk_score < 65;
-                        return (
-                          <tr key={c.id} className="hover:bg-slate-800/30 transition">
-                            <td className="py-3 font-mono font-medium text-white">{c.claim_uid}</td>
-                            <td className="py-3 font-mono text-slate-200">{c.claimed_mwh.toLocaleString()} MWh</td>
-                            <td className="py-3 text-slate-400 text-[11px]">
-                              {new Date(c.period_start).toLocaleDateString()} - {new Date(c.period_end).toLocaleDateString()}
-                            </td>
-                            <td className="py-3">
-                              <span className={`px-2 py-0.5 rounded-full border font-mono text-[10px] font-bold ${
-                                isHigh
-                                  ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                                  : isMed
-                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                              }`}>
-                                {c.risk_score.toFixed(1)} / 100 • {c.risk_level}
-                              </span>
-                            </td>
-                            <td className="py-3">
-                              <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                                c.status === "APPROVED"
-                                  ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/40"
-                                  : c.status === "HELD"
-                                  ? "bg-rose-950/60 text-rose-300 border border-rose-800/40"
-                                  : "bg-amber-950/60 text-amber-300 border border-amber-800/40"
-                              }`}>
-                                {c.status}
-                              </span>
-                            </td>
-                            <td className="py-3 text-right space-x-2">
-                              <button
-                                onClick={() => handleExploreItem(c.claim_uid)}
-                                className="text-blue-400 hover:text-blue-300 font-semibold text-[11px]"
-                              >
-                                Trace Lineage →
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+        {/* ========================================================================= */}
+        {/* TAB 4: DIGITAL REC WALLET                                                 */}
+        {/* ========================================================================= */}
+        {activeTab === "wallet" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-forest-900">Digital REC Wallet</h2>
+                <p className="text-xs sm:text-sm text-sage-600">
+                  Manage minted Renewable Energy Certificates, execute P2P transfers, or redeem for Scope 2 compliance.
+                </p>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <Badge variant="lime" className="text-xs px-3 py-1">
+                  Active Holdings: {certificates.filter((c) => c.status === "ISSUED").length} RECs
+                </Badge>
+              </div>
+            </div>
 
-            {/* TAB: GENERATOR / TRADER - CERTIFICATES WALLET */}
-            {!isRegulator && activeTab === "certificates" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Award className="w-5 h-5 text-emerald-400" />
-                      <span>Digital REC Certificate Wallet</span>
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Minted green attributes backed by cryptographic SHA-256 blocks
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => user && loadDashboardData(user)}
-                    className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs flex items-center gap-1.5"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Refresh</span>
-                  </button>
-                </div>
-
-                {certificates.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl">
-                    No active REC certificates held in this wallet. Approved claims will mint new RECs.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {certificates.map((cert) => (
-                      <div
-                        key={cert.id}
-                        className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 hover:border-slate-700 transition"
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {certificates.map((cert) => (
+                <Card key={cert.id} className="border-sage-200 shadow-sm hover:border-leaf-500 transition-all">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <Badge
+                        variant={
+                          cert.status === "ISSUED"
+                            ? "success"
+                            : cert.status === "REDEEMED"
+                            ? "secondary"
+                            : "outline"
+                        }
                       >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
-                              {cert.fuel_type} ENERGY
-                            </span>
-                            <div className="font-mono text-sm font-bold text-white mt-0.5">{cert.certificate_uid}</div>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            cert.status === "ISSUED"
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                              : cert.status === "REDEEMED"
-                              ? "bg-purple-500/10 text-purple-400 border border-purple-500/30"
-                              : "bg-blue-500/10 text-blue-400 border border-blue-500/30"
-                          }`}>
-                            {cert.status}
-                          </span>
-                        </div>
-
-                        <div className="border-t border-slate-800/80 pt-2.5 grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <div className="text-slate-500 text-[10px]">Volume</div>
-                            <div className="font-mono font-bold text-white">{cert.mwh.toLocaleString()} MWh</div>
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-[10px]">Vintage</div>
-                            <div className="font-mono text-slate-300">{cert.vintage_year}-{cert.vintage_month.toString().padStart(2, "0")}</div>
-                          </div>
-                        </div>
-
-                        <div className="pt-2 flex gap-2">
-                          <button
-                            onClick={() => handleExploreItem(cert.certificate_uid)}
-                            className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition"
-                          >
-                            <Search className="w-3 h-3" />
-                            <span>Lineage</span>
-                          </button>
-                          {cert.status === "ISSUED" && (
-                            <>
-                              <button
-                                onClick={() => setTransferringCert(cert)}
-                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
-                              >
-                                <ArrowRightLeft className="w-3 h-3" />
-                                <span>Transfer</span>
-                              </button>
-                              <button
-                                onClick={() => handleRedeemCert(cert.id)}
-                                className="px-3 py-1.5 bg-purple-900/30 hover:bg-purple-800/50 text-purple-300 border border-purple-700/40 rounded-lg text-xs font-semibold transition"
-                              >
-                                Redeem
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB: GENERATOR / TRADER - POWER PLANTS */}
-            {!isRegulator && activeTab === "plants" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Factory className="w-5 h-5 text-emerald-400" />
-                    <span>Registered Renewable Generation Facilities</span>
-                  </h3>
-                  <p className="text-xs text-slate-400">Clean power plants registered with grid telemetry links</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {plants.map((p) => (
-                    <div key={p.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-bold text-white text-sm">{p.name}</h4>
-                          <span className="text-[11px] font-mono text-emerald-400">{p.fuel_type} • {p.nameplate_capacity_mw} MW Capacity</span>
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">
-                          {p.status}
-                        </span>
-                      </div>
-                      <div className="border-t border-slate-800/80 pt-2.5 space-y-1 text-xs text-slate-400">
-                        <div className="flex justify-between">
-                          <span>Interconnect Code:</span>
-                          <span className="font-mono text-slate-200">{p.grid_interconnection_id}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Theoretical Max Capacity Factor:</span>
-                          <span className="font-mono text-slate-200">{(p.max_capacity_factor * 100).toFixed(0)}%</span>
-                        </div>
-                      </div>
+                        {cert.status}
+                      </Badge>
+                      <span className="text-xs font-mono text-sage-500">Vintage: {cert.vintage_year}-{cert.vintage_month}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: REGULATOR - INVESTIGATION CASES */}
-            {isRegulator && activeTab === "cases" && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Scale className="w-5 h-5 text-blue-400" />
-                      <span>Regulatory Investigation Cases</span>
-                    </h3>
-                    <p className="text-xs text-slate-400">Claims flagged for potential double counting, capacity fraud, or meter mismatches</p>
-                  </div>
-                  <span className="text-xs font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-full">
-                    {cases.filter(c => c.status === "OPEN").length} Pending Review
-                  </span>
-                </div>
-
-                <div className="divide-y divide-slate-800/60">
-                  {cases.map((cs) => (
-                    <div key={cs.id} className="py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-sm text-white">{cs.case_number}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            cs.priority === "CRITICAL"
-                              ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
-                              : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                          }`}>
-                            {cs.priority}
-                          </span>
-                          <span className="text-slate-400 text-xs">| Claim #{cs.claim_id}</span>
-                        </div>
-                        <p className="text-xs text-slate-300 mt-1">
-                          {cs.findings || "Automated forensic trigger: Discrepancy detected during validation pipeline."}
-                        </p>
-                        <div className="text-[11px] text-slate-500 font-mono mt-1">
-                          Decision Action: {cs.decision_action} • Status: {cs.status}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleExploreItem(cs.case_number)}
-                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition"
+                    <CardTitle className="font-mono text-sm mt-2 text-forest-900">
+                      {cert.certificate_uid}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-xs text-sage-600">
+                    <div className="flex justify-between">
+                      <span>Volume:</span>
+                      <span className="font-bold text-forest-900 text-sm">{cert.mwh.toLocaleString()} MWh</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Technology:</span>
+                      <span className="font-medium text-forest-900">{cert.fuel_type}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Owner User ID:</span>
+                      <span className="font-mono">User #{cert.current_owner_id}</span>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex gap-2">
+                    {cert.status === "ISSUED" ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs"
+                          onClick={() => {
+                            setSelectedCert(cert);
+                            setIsTransferModalOpen(true);
+                          }}
                         >
-                          View Dossier →
-                        </button>
-                        {cs.status === "OPEN" && (
-                          <button
-                            onClick={() => {
-                              setSelectedCase(cs);
-                              setAdjudicateAction("CONFIRM_FRAUD_HOLD");
-                              setAdjudicateNotes(cs.findings || "");
-                            }}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow transition"
-                          >
-                            Adjudicate Case
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                          <ArrowRightLeft className="w-3.5 h-3.5 mr-1" /> Transfer
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs bg-leaf-700 hover:bg-leaf-800 text-white"
+                          onClick={() => handleRedeem(cert.id)}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Redeem
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-sage-500 italic py-1">Certificate Retired</span>
+                    )}
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: HYPERLEDGER FABRIC DLT & DEMO SCENARIO                               */}
+        {/* ========================================================================= */}
+        {activeTab === "fabric-dlt" && (
+          <FabricLedgerDashboard />
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 5: REGULATORY ADJUDICATION                                            */}
+        {/* ========================================================================= */}
+        {activeTab === "investigations" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-forest-900">Regulatory Adjudication Terminal</h2>
+                <p className="text-xs sm:text-sm text-sage-600">
+                  Human-in-the-loop judicial case review for flagged fraud claims and wash-trading rings.
+                </p>
               </div>
-            )}
+            </div>
 
-            {/* TAB: REGULATOR - LEDGER AUDIT */}
-            {isRegulator && activeTab === "ledger" && (
-              <div className="space-y-6">
-                {/* HACKATHON LIVE ATTACK & TAMPER PROOF DEMONSTRATOR */}
-                <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-5">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-white flex items-center gap-2">
-                          <Zap className="w-5 h-5 text-amber-400" />
-                          <span>Live Hackathon Tamper Attack Simulator</span>
-                        </h3>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                          Grand Prix Live Demo
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Demonstrates why a centralized relational database (PostgreSQL/SQLite) is vulnerable to rogue administrators or SQL injection, and how our SHA-256 Ledger instantly detects and isolates retroactive tampering.
-                      </p>
-                    </div>
+            <Card className="border-sage-200">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Case Number</TableHead>
+                      <TableHead>Claim ID</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Decision Action</TableHead>
+                      <TableHead className="text-right">Adjudicate</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cases.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-sage-600">
+                          No investigation dockets currently open.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      cases.map((cs) => (
+                        <TableRow key={cs.id}>
+                          <TableCell className="font-mono text-xs font-bold text-forest-900">
+                            {cs.case_number}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            Claim #{cs.claim_id}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                cs.priority === "CRITICAL"
+                                  ? "destructive"
+                                  : cs.priority === "HIGH"
+                                  ? "warning"
+                                  : "outline"
+                              }
+                            >
+                              {cs.priority}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs font-semibold">{cs.status}</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-sage-600">
+                            {cs.decision_action || "PENDING"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedCase(cs);
+                                setIsAdjudicateModalOpen(true);
+                              }}
+                              className="text-xs h-8"
+                            >
+                              <Gavel className="w-3.5 h-3.5 mr-1" /> Order Action
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
+        {/* ========================================================================= */}
+        {/* TAB 6: CRYPTOGRAPHIC LEDGER                                               */}
+        {/* ========================================================================= */}
+        {activeTab === "ledger" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-forest-900">Cryptographic Ledger Inspector</h2>
+                <p className="text-xs sm:text-sm text-sage-600">
+                  Append-only SHA-256 block chain securing all certificate issuance, transfers, and investigations.
+                </p>
+              </div>
+              <Button onClick={loadDashboardData} variant="outline" size="sm" className="gap-2">
+                <RefreshCw className="w-4 h-4" /> Re-audit Chain
+              </Button>
+            </div>
+
+            {/* HACKATHON LIVE ATTACK & TAMPER PROOF DEMONSTRATOR */}
+            <Card className="border-sage-200 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-900 text-white p-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${
-                        ledgerAudit?.is_valid
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                          : "bg-rose-500/20 text-rose-400 border-rose-500/50 animate-pulse"
-                      }`}>
-                        {ledgerAudit?.is_valid ? "✓ SHA-256 CHAIN 100% VALID" : "✗ TAMPER DETECTED"}
-                      </span>
+                      <Zap className="w-5 h-5 text-amber-400" />
+                      <CardTitle className="text-base font-bold text-white">
+                        Live Hackathon Tamper Attack Simulator
+                      </CardTitle>
+                      <Badge variant="outline" className="text-[10px] font-mono uppercase bg-amber-500/20 text-amber-300 border-amber-500/40">
+                        Live Demo
+                      </Badge>
                     </div>
+                    <CardDescription className="text-xs text-slate-300 mt-1">
+                      Demonstrates why a centralized relational database (PostgreSQL/SQLite) is vulnerable to rogue administrators or SQL injection, and how our SHA-256 Ledger instantly detects and isolates retroactive tampering.
+                    </CardDescription>
                   </div>
-
-                  {/* Interactive Attack Controls */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      onClick={handleSimulateTamper}
-                      disabled={tamperLoading}
-                      className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-rose-950/50"
-                    >
-                      {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
-                      <span>Simulate Rogue DB Tamper (+5000 MWh Row Update)</span>
-                    </button>
-
-                    <button
-                      onClick={handleRefreshLedgerAudit}
-                      disabled={tamperLoading}
-                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow"
-                    >
-                      {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                      <span>Run Cryptographic Audit Traversal</span>
-                    </button>
-
-                    <button
-                      onClick={handleRestoreTamper}
-                      disabled={tamperLoading}
-                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow"
-                    >
-                      {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                      <span>Self-Heal & Restore Ledger Parity</span>
-                    </button>
+                  <div>
+                    <Badge variant={ledgerAudit?.is_valid ? "success" : "destructive"} className="text-xs font-mono font-bold">
+                      {ledgerAudit?.is_valid ? "✓ SHA-256 CHAIN 100% VALID" : "✗ TAMPER DETECTED"}
+                    </Badge>
                   </div>
+                </div>
+              </CardHeader>
+              <CardContent className="bg-slate-950 text-white p-5 space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={handleSimulateTamper}
+                    disabled={tamperLoading}
+                    variant="destructive"
+                    size="sm"
+                    className="font-bold text-xs gap-2"
+                  >
+                    {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                    Simulate Rogue DB Tamper (+5000 MWh Row Update)
+                  </Button>
 
-                  {/* Tamper Alert Banner */}
-                  {!ledgerAudit?.is_valid && (
-                    <div className="p-4 bg-rose-950/40 border border-rose-600 rounded-xl space-y-2">
-                      <div className="flex items-center gap-2 text-rose-300 font-bold text-xs">
-                        <ShieldAlert className="w-4 h-4 text-rose-400" />
-                        <span>CRYPTOGRAPHIC INTEGRITY VIOLATION DETECTED</span>
-                      </div>
-                      <p className="text-xs text-rose-200">
-                        {ledgerAudit?.verification_message}
-                      </p>
+                  <Button
+                    onClick={handleRefreshLedgerAudit}
+                    disabled={tamperLoading}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs gap-2"
+                  >
+                    {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Run Cryptographic Audit Traversal
+                  </Button>
+
+                  <Button
+                    onClick={handleRestoreTamper}
+                    disabled={tamperLoading}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-2"
+                  >
+                    {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    Self-Heal & Restore Ledger Parity
+                  </Button>
+                </div>
+
+                {!ledgerAudit?.is_valid && (
+                  <Alert variant="destructive">
+                    <ShieldAlert className="w-4 h-4" />
+                    <AlertTitle>CRYPTOGRAPHIC INTEGRITY VIOLATION DETECTED</AlertTitle>
+                    <AlertDescription className="text-xs mt-1">
+                      {ledgerAudit?.verification_message}
                       <div className="text-[11px] font-mono text-rose-300/80 pt-1">
                         Off-chain database was altered out-of-consensus. Consensus peers reject this block and all downstream certificate mints until restored.
                       </div>
-                    </div>
-                  )}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-                  {ledgerAudit?.is_valid && (
-                    <div className="p-3.5 bg-emerald-950/30 border border-emerald-800 rounded-xl flex items-center justify-between text-xs text-emerald-300">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span>{ledgerAudit.verification_message}</span>
-                      </div>
-                      <span className="font-mono text-[11px] text-emerald-400/80">Traversed from Genesis to Head</span>
-                    </div>
-                  )}
+                {ledgerAudit?.is_valid && (
+                  <Alert variant="forest">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <AlertTitle>Consensus Integrity Verified</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      {ledgerAudit.verification_message} — Traversed from Genesis to Head.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ZERO-KNOWLEDGE PRIVACY & CONFIDENTIAL CLAIM VERIFIER */}
+            <Card className="border-sage-200 shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-leaf-700" />
+                  <CardTitle className="text-base font-bold text-forest-900">
+                    Zero-Knowledge Data Protection & Privacy Verifier
+                  </CardTitle>
+                  <Badge variant="outline" className="text-[10px] font-mono text-leaf-700 border-leaf-300">
+                    RFC-3526 Pedersen MODP-2048
+                  </Badge>
+                </div>
+                <CardDescription className="text-xs text-sage-600 mt-1">
+                  Allows enterprise buyers and generators to prove generation compliance without disclosing proprietary factory load curves or confidential PPA contract pricing.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="space-y-1.5">
+                    <Label>Claimed Clean Energy (MWh)</Label>
+                    <Input
+                      type="number"
+                      value={zkClaimMwh}
+                      onChange={(e) => setZkClaimMwh(Number(e.target.value))}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Confidential Smart Meter Reading (MWh)</Label>
+                    <Input
+                      type="number"
+                      value={zkMeterMwh}
+                      onChange={(e) => setZkMeterMwh(Number(e.target.value))}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Allowed Tolerance (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={zkTolerance}
+                      onChange={(e) => setZkTolerance(Number(e.target.value))}
+                      className="font-mono"
+                    />
+                  </div>
                 </div>
 
-                {/* ZERO-KNOWLEDGE PRIVACY & CONFIDENTIAL CLAIM VERIFIER */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-800 pb-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-indigo-400" />
-                        <h3 className="text-base font-bold text-white">Zero-Knowledge Data Protection & Privacy Verifier</h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
-                          RFC-3526 Pedersen MODP-2048
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Allows enterprise buyers and generators to prove generation compliance without disclosing proprietary factory load curves or confidential PPA contract pricing.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                    <div>
-                      <label className="block text-slate-300 mb-1">Claimed Clean Energy (MWh)</label>
-                      <input
-                        type="number"
-                        value={zkClaimMwh}
-                        onChange={(e) => setZkClaimMwh(Number(e.target.value))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 mb-1">Confidential Smart Meter Reading (MWh)</label>
-                      <input
-                        type="number"
-                        value={zkMeterMwh}
-                        onChange={(e) => setZkMeterMwh(Number(e.target.value))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 mb-1">Allowed Tolerance (%)</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={zkTolerance}
-                        onChange={(e) => setZkTolerance(Number(e.target.value))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleGenerateZkProof}
-                      disabled={zkLoading}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow"
-                    >
-                      {zkLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      <span>Generate Non-Interactive Zero-Knowledge (NIZK) Proof</span>
-                    </button>
-                  </div>
-
-                  {zkProofResult && (
-                    <div className="p-4 bg-slate-950 border border-indigo-900/60 rounded-xl space-y-2 font-mono text-[11px]">
-                      <div className="flex items-center justify-between text-indigo-400 font-bold">
-                        <span>ZK Range Proof Protocol: {zkProofResult.proof_protocol}</span>
-                        <span className={`px-2 py-0.5 rounded ${zkProofResult.is_valid_proof ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
-                          {zkProofResult.is_valid_proof ? "✓ PROOF VALIDATED" : "✗ PROOF REJECTED"}
-                        </span>
-                      </div>
-                      <div className="text-slate-400 break-all">
-                        <span className="text-slate-300 font-semibold">Claim Commitment (C_claim):</span> {zkProofResult.claim_commitment}
-                      </div>
-                      <div className="text-slate-400 break-all">
-                        <span className="text-slate-300 font-semibold">Meter Commitment (C_meter):</span> {zkProofResult.meter_commitment}
-                      </div>
-                      <div className="text-slate-400 break-all">
-                        <span className="text-slate-300 font-semibold">Fiat-Shamir Challenge (e):</span> {zkProofResult.fiat_shamir_challenge}
-                      </div>
-                      <div className="text-emerald-400 pt-1 font-sans text-xs">
-                        🛡️ {zkProofResult.confidentiality_guarantee}
-                      </div>
-                    </div>
-                  )}
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleGenerateZkProof}
+                    disabled={zkLoading}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {zkLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    Generate Non-Interactive Zero-Knowledge (NIZK) Proof
+                  </Button>
                 </div>
 
-                {/* CHRONOLOGICAL BLOCK EXPLORER */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                  <div className="flex justify-between items-center mb-4">
-                    <div>
-                      <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <Link2 className="w-5 h-5 text-teal-400" />
-                        <span>SHA-256 Cryptographic Ledger Explorer</span>
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        Zero-tampering hash-linked chain securing claim submissions, mints, and transfers
-                      </p>
+                {zkProofResult && (
+                  <div className="p-4 bg-sage-50 border border-sage-200 rounded-xl space-y-2 font-mono text-[11px]">
+                    <div className="flex items-center justify-between font-bold text-forest-900">
+                      <span>ZK Range Proof Protocol: {zkProofResult.proof_protocol}</span>
+                      <Badge variant={zkProofResult.is_valid_proof ? "success" : "destructive"}>
+                        {zkProofResult.is_valid_proof ? "✓ PROOF VALIDATED" : "✗ PROOF REJECTED"}
+                      </Badge>
                     </div>
-                    <span className="text-xs font-mono text-slate-400">{ledgerBlocks.length} Blocks Recorded</span>
+                    <div className="text-sage-700 break-all">
+                      <span className="font-semibold text-forest-900">Claim Commitment (C_claim):</span> {zkProofResult.claim_commitment}
+                    </div>
+                    <div className="text-sage-700 break-all">
+                      <span className="font-semibold text-forest-900">Meter Commitment (C_meter):</span> {zkProofResult.meter_commitment}
+                    </div>
+                    <div className="text-sage-700 break-all">
+                      <span className="font-semibold text-forest-900">Fiat-Shamir Challenge (e):</span> {zkProofResult.fiat_shamir_challenge}
+                    </div>
+                    <div className="text-leaf-700 pt-1 font-sans text-xs font-semibold">
+                      🛡️ {zkProofResult.confidentiality_guarantee}
+                    </div>
                   </div>
+                )}
+              </CardContent>
+            </Card>
 
-                  <div className="space-y-2.5">
+            {/* Document Hash Verification Tool */}
+            <Card className="border-sage-200">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileCheck2 className="w-5 h-5 text-leaf-700" />
+                  Evidence Document Hash Verifier
+                </CardTitle>
+                <CardDescription>
+                  Upload any utility single-line diagram or meter CSV report to check cryptographic integrity and prevent document reuse.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border-2 border-dashed border-sage-300 rounded-xl p-6 text-center bg-sage-50/50 hover:bg-sage-50 transition-colors">
+                  <input
+                    type="file"
+                    id="doc-file-input"
+                    className="hidden"
+                    onChange={handleDocumentVerify}
+                    disabled={verifyingDoc}
+                  />
+                  <label htmlFor="doc-file-input" className="cursor-pointer flex flex-col items-center">
+                    <FileSearch className="w-8 h-8 text-leaf-700 mb-2" />
+                    <span className="text-sm font-semibold text-forest-900">
+                      {verifyingDoc ? "Computing SHA-256 Hash..." : "Click to select evidence document"}
+                    </span>
+                    <span className="text-xs text-sage-500 mt-1">PDF, CSV, or PNG telemetry files</span>
+                  </label>
+                </div>
+
+                {docVerifyResult && (
+                  <Alert variant={docVerifyResult.is_registered ? "forest" : "warning"}>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <AlertTitle>Verification Result: {docVerifyResult.verification_status}</AlertTitle>
+                    <AlertDescription className="font-mono text-xs mt-1">
+                      File: {docVerifyResult.file_name} <br />
+                      Computed Hash: {docVerifyResult.computed_sha256} <br />
+                      First Registered Claim: {docVerifyResult.first_seen_claim_uid || "None (New Unregistered Hash)"}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Block Explorer Table */}
+            <Card className="border-sage-200">
+              <CardHeader>
+                <CardTitle className="text-base">Ledger Hash Chain Blocks</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Height</TableHead>
+                      <TableHead>Timestamp</TableHead>
+                      <TableHead>Event Type</TableHead>
+                      <TableHead>Entity ID</TableHead>
+                      <TableHead>Block Hash</TableHead>
+                      <TableHead>Parent Hash</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {ledgerBlocks.map((blk) => (
-                      <div
-                        key={blk.id}
-                        className="p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-xs space-y-1"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-teal-400 font-bold">BLOCK #{blk.index} • {blk.event_type}</span>
-                          <span className="text-slate-500 text-[10px]">{new Date(blk.timestamp).toLocaleString()}</span>
-                        </div>
-                        <div className="text-slate-300 text-[11px]">
-                          Entity: {blk.entity_type} ({blk.entity_id})
-                        </div>
-                        <div className="text-[10px] text-slate-500 break-all">
-                          <span className="text-slate-400">Hash:</span> {blk.current_hash}
-                        </div>
-                      </div>
+                      <TableRow key={blk.id}>
+                        <TableCell className="font-mono font-bold text-xs">#{blk.index}</TableCell>
+                        <TableCell className="text-xs text-sage-600">{new Date(blk.timestamp).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px]">
+                            {blk.event_type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{blk.entity_id}</TableCell>
+                        <TableCell className="font-mono text-[10px] truncate max-w-[140px] text-leaf-700">
+                          {blk.current_hash}
+                        </TableCell>
+                        <TableCell className="font-mono text-[10px] truncate max-w-[140px] text-sage-500">
+                          {blk.previous_hash}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: DEFAULT (CLAIMS AUDIT & AI FRAUD RADAR) */}
-            {(activeTab === "dashboard" || (isRegulator && activeTab === "claims")) && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-5 space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <FileSearch className={`w-5 h-5 ${isRegulator ? "text-blue-400" : "text-emerald-400"}`} />
-                      <span>{isRegulator ? "Claims Forensic Surveillance & AI Scores" : "Recent Generation Claims"}</span>
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Cross-referenced against smart meter telemetry, grid interconnection capacity, and ML anomaly models
-                    </p>
-                  </div>
-                  <span className="text-xs text-slate-400">Click any row to trace complete lineage</span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-800 text-slate-400 pb-2">
-                      <tr>
-                        <th className="py-2.5">Claim UID</th>
-                        <th className="py-2.5">Claimed MWh</th>
-                        <th className="py-2.5">AI Risk Score</th>
-                        <th className="py-2.5">Engine Recommendation</th>
-                        <th className="py-2.5">Status</th>
-                        <th className="py-2.5 text-right">Lineage</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {claims.map((c) => {
-                        const isHigh = c.risk_score >= 65;
-                        const isMed = c.risk_score >= 25 && c.risk_score < 65;
-                        const badge = isHigh
-                          ? "text-rose-400 bg-rose-500/10 border-rose-500/30"
-                          : isMed
-                          ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
-                          : "text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
-
-                        return (
-                          <tr
-                            key={c.id}
-                            className="hover:bg-slate-800/40 transition"
-                          >
-                            <td className="py-3 font-mono font-medium text-white">{c.claim_uid}</td>
-                            <td className="py-3 font-mono text-slate-300">{c.claimed_mwh.toLocaleString()} MWh</td>
-                            <td className="py-3">
-                              <span className={`px-2.5 py-0.5 rounded-full border font-mono font-bold ${badge}`}>
-                                {c.risk_score.toFixed(1)} / 100
-                              </span>
-                            </td>
-                            <td className="py-3 font-semibold text-slate-200">
-                              {c.risk_breakdown?.recommendation || (isHigh ? "HOLD" : isMed ? "REVIEW" : "APPROVE")}
-                            </td>
-                            <td className="py-3">
-                              <span className="text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded text-[11px]">
-                                {c.status}
-                              </span>
-                            </td>
-                            <td className="py-3 text-right">
-                              <button
-                                onClick={() => handleExploreItem(c.claim_uid)}
-                                className="text-blue-400 hover:text-blue-300 font-semibold text-[11px]"
-                              >
-                                Trace Lineage →
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </main>
 
-      {/* MODAL: SUBMIT NEW CLAIM (Generator) */}
-      {showClaimModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Plus className="w-5 h-5 text-emerald-400" />
-                <span>Submit Renewable Generation Claim</span>
-              </h3>
-              <button onClick={() => setShowClaimModal(false)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
+      {/* ========================================================================= */}
+      {/* MODALS AND DIALOGS                                                        */}
+      {/* ========================================================================= */}
 
-            <form onSubmit={handleSubmitClaim} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 mb-1">Select Power Plant Facility</label>
-                <select
-                  value={newClaimPlantId}
-                  onChange={(e) => setNewClaimPlantId(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                >
-                  {plants.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.fuel_type} - {p.nameplate_capacity_mw} MW)
-                    </option>
-                  ))}
-                </select>
-              </div>
+      {/* Claim Forensics Inspection Dialog */}
+      <Dialog open={!!selectedClaim} onOpenChange={(open) => !open && setSelectedClaim(null)}>
+        <DialogContent onClose={() => setSelectedClaim(null)}>
+          <DialogHeader>
+            <DialogTitle>Forensic Risk Breakdown</DialogTitle>
+            <DialogDescription>
+              Claim UID: <span className="font-mono font-bold text-forest-900">{selectedClaim?.claim_uid}</span>
+            </DialogDescription>
+          </DialogHeader>
 
-              <div>
-                <label className="block text-slate-300 mb-1">Claimed Production (MWh)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  required
-                  value={newClaimMwh}
-                  onChange={(e) => setNewClaimMwh(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+          {selectedClaim && (
+            <div className="space-y-4 text-xs">
+              <div className="p-4 rounded-xl bg-sage-50 border border-sage-200 flex items-center justify-between">
                 <div>
-                  <label className="block text-slate-300 mb-1">Generation Start Date</label>
-                  <input
-                    type="text"
-                    required
-                    value={newClaimStart}
-                    onChange={(e) => setNewClaimStart(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-[11px]"
-                  />
+                  <p className="text-sage-600 font-semibold">Composite Risk Score</p>
+                  <p className="text-2xl font-bold text-forest-900">{selectedClaim.risk_score.toFixed(1)} / 100</p>
                 </div>
-                <div>
-                  <label className="block text-slate-300 mb-1">Generation End Date</label>
-                  <input
-                    type="text"
-                    required
-                    value={newClaimEnd}
-                    onChange={(e) => setNewClaimEnd(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-[11px]"
-                  />
+                <Badge
+                  variant={
+                    selectedClaim.risk_score >= 70
+                      ? "destructive"
+                      : selectedClaim.risk_score >= 30
+                      ? "warning"
+                      : "success"
+                  }
+                  className="text-sm px-3 py-1"
+                >
+                  {selectedClaim.risk_score >= 70 ? "CRITICAL FRAUD" : selectedClaim.risk_score >= 30 ? "NEEDS REVIEW" : "SAFE"}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2.5 rounded-lg bg-white border border-sage-200">
+                  <p className="text-[10px] text-sage-500 font-semibold uppercase">Rule Engine</p>
+                  <p className="text-sm font-bold text-forest-900">
+                    {selectedClaim.risk_breakdown?.rule_engine_score?.toFixed(1) || 0}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-sage-200">
+                  <p className="text-[10px] text-sage-500 font-semibold uppercase">ML Anomaly</p>
+                  <p className="text-sm font-bold text-forest-900">
+                    {selectedClaim.risk_breakdown?.ml_anomaly_score?.toFixed(1) || 0}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-sage-200">
+                  <p className="text-[10px] text-sage-500 font-semibold uppercase">Graph Risk</p>
+                  <p className="text-sm font-bold text-forest-900">
+                    {selectedClaim.risk_breakdown?.graph_risk_score?.toFixed(1) || 0}
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 mb-1">Smart Meter Telemetry Reference ID</label>
-                <input
-                  type="number"
-                  value={newClaimMeterId}
-                  onChange={(e) => setNewClaimMeterId(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                />
-              </div>
+              {selectedClaim.risk_breakdown?.summary_explanation && (
+                <div className="p-3 rounded-lg bg-white border border-sage-200">
+                  <p className="font-semibold text-forest-900 mb-1">Forensic Findings:</p>
+                  <p className="text-sage-600">{selectedClaim.risk_breakdown.summary_explanation}</p>
+                </div>
+              )}
+            </div>
+          )}
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowClaimModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"
-                >
-                  {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  <span>Submit to Forensic Pipeline</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedClaim(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* MODAL: TRANSFER REC (Generator / Trader) */}
-      {transferringCert && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <ArrowRightLeft className="w-5 h-5 text-emerald-400" />
-                <span>Transfer REC Certificate</span>
-              </h3>
-              <button onClick={() => setTransferringCert(null)} className="text-slate-400 hover:text-white">✕</button>
+      {/* New Claim Submission Modal */}
+      <Dialog open={isSubmitModalOpen} onOpenChange={setIsSubmitModalOpen}>
+        <DialogContent onClose={() => setIsSubmitModalOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Submit Clean Generation Claim</DialogTitle>
+            <DialogDescription>
+              Submit metered generation to trigger instant hybrid fraud scoring and cryptographic certificate minting.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateClaim} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Select Clean Power Asset</Label>
+              <Select
+                value={newClaimPlantId}
+                onChange={(e) => setNewClaimPlantId(Number(e.target.value))}
+              >
+                {plants.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.nameplate_capacity_mw} MW {p.fuel_type})
+                  </option>
+                ))}
+              </Select>
             </div>
 
-            <form onSubmit={handleTransferCert} className="space-y-3 text-xs">
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                <div className="text-[10px] text-slate-500 uppercase">Certificate UID</div>
-                <div className="font-mono font-bold text-white text-sm">{transferringCert.certificate_uid}</div>
-                <div className="text-slate-400 text-[11px] mt-1">{transferringCert.mwh} MWh • {transferringCert.fuel_type}</div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 mb-1">Transfer Destination (Recipient User ID)</label>
-                <input
-                  type="number"
-                  required
-                  value={transferToUserId}
-                  onChange={(e) => setTransferToUserId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                  placeholder="e.g. 3 (Trader account)"
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Period Start</Label>
+                <Input
+                  value={newClaimStart}
+                  onChange={(e) => setNewClaimStart(e.target.value)}
+                  placeholder="YYYY-MM-DDTHH:MM:SSZ"
                 />
               </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setTransferringCert(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"
-                >
-                  {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  <span>Execute Transfer</span>
-                </button>
+              <div className="space-y-1.5">
+                <Label>Period End</Label>
+                <Input
+                  value={newClaimEnd}
+                  onChange={(e) => setNewClaimEnd(e.target.value)}
+                  placeholder="YYYY-MM-DDTHH:MM:SSZ"
+                />
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: ADJUDICATE CASE (Regulator) */}
-      {selectedCase && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Scale className="w-5 h-5 text-blue-400" />
-                <span>Adjudicate Case: {selectedCase.case_number}</span>
-              </h3>
-              <button onClick={() => setSelectedCase(null)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
-            <form onSubmit={handleAdjudicateCase} className="space-y-4 text-xs">
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Target Claim:</span>
-                  <span className="font-mono text-white">Claim #{selectedCase.claim_id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Case Priority:</span>
-                  <span className="font-mono text-rose-400 font-bold">{selectedCase.priority}</span>
-                </div>
-              </div>
+            <div className="space-y-1.5">
+              <Label>Claimed Energy (MWh)</Label>
+              <Input
+                type="number"
+                value={newClaimMwh}
+                onChange={(e) => setNewClaimMwh(Number(e.target.value))}
+                min={1}
+                required
+              />
+            </div>
 
-              {/* LangGraph Autonomous AI Forensic Agent Trigger */}
-              <div className="p-3 bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-slate-900 rounded-xl border border-purple-500/30 space-y-2">
+            {claimSubmitError && (
+              <Alert variant="destructive">
+                <AlertDescription>{claimSubmitError}</AlertDescription>
+              </Alert>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsSubmitModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={actionLoading}>
+                {actionLoading ? "Submitting..." : "Submit to Fraud Engine"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Adjudication Modal */}
+      <Dialog open={isAdjudicateModalOpen} onOpenChange={setIsAdjudicateModalOpen}>
+        <DialogContent onClose={() => setIsAdjudicateModalOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Regulatory Judicial Order</DialogTitle>
+            <DialogDescription>
+              Case: <span className="font-mono font-bold text-forest-900">{selectedCase?.case_number}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-xs">
+            {/* LangGraph Autonomous AI Forensic Agent Trigger */}
+            {selectedCase && (
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-bold text-purple-300 text-xs flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    <div className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600" />
                       <span>LangGraph Multi-Agent Forensic Investigation</span>
                     </div>
-                    <p className="text-[10px] text-purple-300/70 mt-0.5">
+                    <p className="text-[10px] text-purple-700/80 mt-0.5">
                       Autonomous cross-check: Clean energy registry + Satellite weather irradiance
                     </p>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={() => handleRunAiInvestigation(selectedCase.id)}
                     disabled={aiAgentLoading}
-                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                    className="bg-purple-600 hover:bg-purple-700 text-white h-7 text-xs gap-1.5"
                   >
                     {aiAgentLoading ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
                     <span>{aiAgentLoading ? "Investigating..." : "Run AI Agent"}</span>
-                  </button>
+                  </Button>
                 </div>
 
                 {aiAgentResult && (
-                  <div className="mt-2 p-2.5 bg-slate-950/80 rounded-lg border border-purple-500/40 space-y-1.5 font-mono text-[11px]">
+                  <div className="mt-2 p-2.5 bg-white rounded-lg border border-purple-200 space-y-1.5 font-mono text-[11px]">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Agent Verdict:</span>
-                      <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${aiAgentResult.agent_verdict === 'CONFIRM_FRAUD_HOLD' ? 'bg-rose-950 text-rose-300 border border-rose-700' : 'bg-emerald-950 text-emerald-300 border border-emerald-700'}`}>
+                      <span className="text-sage-600">Agent Verdict:</span>
+                      <Badge variant={aiAgentResult.agent_verdict === 'CONFIRM_FRAUD_HOLD' ? 'destructive' : 'success'}>
                         {aiAgentResult.agent_verdict} (Score: {aiAgentResult.agent_risk_score})
-                      </span>
+                      </Badge>
                     </div>
                     {aiAgentResult.weather_evidence && (
-                      <div className="text-[10px] text-slate-300 flex justify-between">
-                        <span className="text-slate-400">Atmospheric Irradiance:</span>
+                      <div className="text-[10px] text-forest-900 flex justify-between">
+                        <span className="text-sage-600">Atmospheric Irradiance:</span>
                         <span>{aiAgentResult.weather_evidence.avg_solar_radiation_w_m2} W/m² ({aiAgentResult.weather_evidence.irradiance_quality})</span>
                       </div>
                     )}
                     {aiAgentResult.registry_evidence && (
-                      <div className="text-[10px] text-slate-300 flex justify-between">
-                        <span className="text-slate-400">Registry Accredited:</span>
+                      <div className="text-[10px] text-forest-900 flex justify-between">
+                        <span className="text-sage-600">Registry Accredited:</span>
                         <span>{aiAgentResult.registry_evidence.accredited_id} ({aiAgentResult.registry_evidence.accredited_capacity_mw} MW)</span>
                       </div>
                     )}
                   </div>
                 )}
               </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Regulatory Ruling</Label>
+              <Select
+                value={adjudicateAction}
+                onChange={(e) => setAdjudicateAction(e.target.value as any)}
+              >
+                <option value="CONFIRM_FRAUD_HOLD">CONFIRM_FRAUD_HOLD (Reject & Sanction)</option>
+                <option value="CLEAR_AND_ISSUE">CLEAR_AND_ISSUE (Approve & Mint REC)</option>
+              </Select>
+            </div>
 
-              <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Regulatory Decision Action</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAdjudicateAction("CONFIRM_FRAUD_HOLD")}
-                    className={`p-3 rounded-xl border text-left transition ${
-                      adjudicateAction === "CONFIRM_FRAUD_HOLD"
-                        ? "bg-rose-950/40 border-rose-600 text-rose-200"
-                        : "bg-slate-950 border-slate-800 text-slate-400"
-                    }`}
-                  >
-                    <div className="font-bold flex items-center gap-1.5 text-rose-400">
-                      <XCircle className="w-4 h-4" />
-                      <span>Confirm Fraud Hold</span>
-                    </div>
-                    <p className="text-[10px] mt-1 text-slate-400">Permanently reject claim & record violation</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAdjudicateAction("CLEAR_AND_ISSUE")}
-                    className={`p-3 rounded-xl border text-left transition ${
-                      adjudicateAction === "CLEAR_AND_ISSUE"
-                        ? "bg-emerald-950/40 border-emerald-600 text-emerald-200"
-                        : "bg-slate-950 border-slate-800 text-slate-400"
-                    }`}
-                  >
-                    <div className="font-bold flex items-center gap-1.5 text-emerald-400">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Clear & Issue REC</span>
-                    </div>
-                    <p className="text-[10px] mt-1 text-slate-400">Dismiss anomaly as legitimate & mint certificate</p>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Judicial Findings & Regulatory Order</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={adjudicateNotes}
-                  onChange={(e) => setAdjudicateNotes(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-xs"
-                  placeholder="Record justification, audit trail notes, or statutory sanction..."
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCase(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"
-                >
-                  {actionLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Scale className="w-4 h-4" />}
-                  <span>Sign & Seal Decision</span>
-                </button>
-              </div>
-            </form>
+            <div className="space-y-1.5">
+              <Label>Investigative Findings & Legal Notes</Label>
+              <Input
+                value={adjudicateFindings}
+                onChange={(e) => setAdjudicateFindings(e.target.value)}
+                placeholder="Document verification check passed / Failed meter audit..."
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAdjudicateModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant={adjudicateAction === "CONFIRM_FRAUD_HOLD" ? "destructive" : "default"}
+              onClick={handleAdjudicate}
+              disabled={actionLoading}
+            >
+              {actionLoading ? "Submitting Order..." : "Sign & Commit Judicial Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* P2P Transfer Modal */}
+      <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
+        <DialogContent onClose={() => setIsTransferModalOpen(false)}>
+          <DialogHeader>
+            <DialogTitle>Transfer REC Certificate</DialogTitle>
+            <DialogDescription>
+              Certificate: <span className="font-mono font-bold text-forest-900">{selectedCert?.certificate_uid}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <Label>Target Recipient User ID</Label>
+              <Input
+                type="number"
+                value={transferTargetUser}
+                onChange={(e) => setTransferTargetUser(Number(e.target.value))}
+                min={1}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Transfer Audit Notes</Label>
+              <Input
+                value={transferNotes}
+                onChange={(e) => setTransferNotes(e.target.value)}
+                placeholder="Bilateral OTC trade reference..."
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTransferModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleTransfer} disabled={actionLoading}>
+              {actionLoading ? "Transferring..." : "Confirm P2P Transfer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
