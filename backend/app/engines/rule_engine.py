@@ -1,3 +1,4 @@
+import math
 import hashlib
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
@@ -8,6 +9,7 @@ from app.models.plant import Plant, FuelType
 from app.models.meter import MeterReading
 from app.models.claim import CertificateClaim, DocumentEvidence, ClaimStatus
 from app.schemas.risk import RiskFactorItem
+from app.services.weather_oracle import WeatherOracleService
 
 
 def compute_submission_fingerprint(plant_id: int, start: datetime, end: datetime, mwh: float) -> str:
@@ -274,6 +276,165 @@ class RuleEngine:
                         )
                     )
 
+        # -------------------------------------------------------------
+        # 6. Environmental Weather & Solar Irradiance Ground Truth
+        # -------------------------------------------------------------
+        weather_eval = WeatherOracleService.evaluate_generation_feasibility(
+            fuel_type=plant.fuel_type,
+            nameplate_capacity_mw=plant.nameplate_capacity_mw,
+            claimed_mwh=claimed_mwh,
+            period_start=start_utc,
+            period_end=end_utc,
+            latitude=plant.latitude,
+            longitude=plant.longitude,
+        )
+        if not weather_eval["is_feasible"]:
+            discrepancy = weather_eval.get("discrepancy_pct", 0.0)
+            score_contrib = 85.0 if discrepancy > 30.0 else 50.0
+            sev = "CRITICAL" if discrepancy > 30.0 else "HIGH"
+            if discrepancy > 30.0:
+                has_critical_override = True
+            rule_score += score_contrib
+            factors.append(
+                RiskFactorItem(
+                    rule_id="RULE-011",
+                    name="Environmental Weather Infeasibility (Phantom Generation)",
+                    category="METEOROLOGICAL_CHECK",
+                    severity=sev,
+                    score_contribution=score_contrib,
+                    description=weather_eval["reason"],
+                    flagged=True,
+                    evidence_details=weather_eval,
+                )
+            )
+
+        # -------------------------------------------------------------
+        # 7. Overlapping Generation Interval (Time-Slice Double Counting)
+        # -------------------------------------------------------------
+        overlap_query = db.query(CertificateClaim).filter(
+            CertificateClaim.plant_id == plant.id,
+            CertificateClaim.period_start < end_utc,
+            CertificateClaim.period_end > start_utc,
+            CertificateClaim.status != ClaimStatus.REJECTED,
+        )
+        if current_claim_id:
+            overlap_query = overlap_query.filter(CertificateClaim.id != current_claim_id)
+
+        overlapping_claims = overlap_query.all()
+        # Filter out if it was already caught by exact fingerprint (RULE-008)
+        overlapping_claims = [
+            c for c in overlapping_claims
+            if not (c.period_start == start_utc and c.period_end == end_utc and c.claimed_mwh == claimed_mwh)
+        ]
+
+        if overlapping_claims:
+            for conf_claim in overlapping_claims[:2]:
+                conf_start = conf_claim.period_start.replace(tzinfo=timezone.utc) if conf_claim.period_start.tzinfo is None else conf_claim.period_start
+                conf_end = conf_claim.period_end.replace(tzinfo=timezone.utc) if conf_claim.period_end.tzinfo is None else conf_claim.period_end
+                overlap_start = max(start_utc, conf_start)
+                overlap_end = min(end_utc, conf_end)
+                overlap_hours = max((overlap_end - overlap_start).total_seconds() / 3600.0, 0.0)
+
+                if overlap_hours > 0.5:
+                    rule_score += 85.0
+                    has_critical_override = True
+                    factors.append(
+                        RiskFactorItem(
+                            rule_id="RULE-012",
+                            name="Overlapping Generation Window Claim (Time Slicing)",
+                            category="DUPLICATE_CHECK",
+                            severity="CRITICAL",
+                            score_contribution=85.0,
+                            description=(
+                                f"Generation interval overlaps by {overlap_hours:.1f} hours with previously submitted "
+                                f"claim {conf_claim.claim_uid} (time-slice double-counting risk)."
+                            ),
+                            flagged=True,
+                            evidence_details={
+                                "conflicting_claim_uid": conf_claim.claim_uid,
+                                "overlap_hours": round(overlap_hours, 2),
+                                "overlap_start": overlap_start.isoformat(),
+                                "overlap_end": overlap_end.isoformat(),
+                            },
+                        )
+                    )
+
+        # -------------------------------------------------------------
+        # 8. Diurnal Waveform & Nocturnal Solar Check
+        # -------------------------------------------------------------
+        if plant.fuel_type == FuelType.SOLAR and claimed_mwh > 0:
+            duration_hrs = (end_utc - start_utc).total_seconds() / 3600.0
+            if duration_hrs <= 12.0:
+                is_start_night = start_utc.hour >= 20 or start_utc.hour < 5
+                is_end_night = end_utc.hour >= 20 or end_utc.hour <= 5
+                if is_start_night and is_end_night:
+                    rule_score += 90.0
+                    has_critical_override = True
+                    factors.append(
+                        RiskFactorItem(
+                            rule_id="RULE-013",
+                            name="Nocturnal Solar Generation Violation",
+                            category="PHYSICS_CHECK",
+                            severity="CRITICAL",
+                            score_contribution=90.0,
+                            description=(
+                                f"Claimed {claimed_mwh:.2f} MWh solar generation strictly during nocturnal hours "
+                                f"({start_utc.strftime('%H:%M')} to {end_utc.strftime('%H:%M')}). Zero solar irradiance exists at night."
+                            ),
+                            flagged=True,
+                            evidence_details={
+                                "start_hour_utc": start_utc.hour,
+                                "end_hour_utc": end_utc.hour,
+                                "fuel_type": "SOLAR",
+                            },
+                        )
+                    )
+
+        # -------------------------------------------------------------
+        # 9. Spatial Geo-Colocation Collusion (Haversine Proximity Check)
+        # -------------------------------------------------------------
+        if plant.latitude is not None and plant.longitude is not None:
+            all_plants = db.query(Plant).filter(Plant.id != plant.id).all()
+            for other_plant in all_plants:
+                if other_plant.latitude is not None and other_plant.longitude is not None:
+                    R = 6371.0  # Earth radius in km
+                    dlat = math.radians(other_plant.latitude - plant.latitude)
+                    dlon = math.radians(other_plant.longitude - plant.longitude)
+                    a = (
+                        math.sin(dlat / 2) ** 2
+                        + math.cos(math.radians(plant.latitude))
+                        * math.cos(math.radians(other_plant.latitude))
+                        * math.sin(dlon / 2) ** 2
+                    )
+                    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+                    distance_km = R * c
+
+                    cap_ratio = abs(plant.nameplate_capacity_mw - other_plant.nameplate_capacity_mw) / max(plant.nameplate_capacity_mw, 0.1)
+                    if distance_km <= 1.5 and plant.fuel_type == other_plant.fuel_type and cap_ratio <= 0.15:
+                        rule_score += 70.0
+                        factors.append(
+                            RiskFactorItem(
+                                rule_id="RULE-014",
+                                name="Spatial Geo-Colocation Collusion (Multi-Registry Double Registration)",
+                                category="GEOSPATIAL_CHECK",
+                                severity="HIGH",
+                                score_contribution=70.0,
+                                description=(
+                                    f"Facility is located within {distance_km:.2f} km of facility '{other_plant.name}' "
+                                    f"with identical {plant.fuel_type.value} fuel type and capacity ({plant.nameplate_capacity_mw} MW vs {other_plant.nameplate_capacity_mw} MW). "
+                                    f"Potential duplicate facility registration across registries."
+                                ),
+                                flagged=True,
+                                evidence_details={
+                                    "distance_km": round(distance_km, 3),
+                                    "conflicting_plant_id": other_plant.id,
+                                    "conflicting_plant_name": other_plant.name,
+                                    "conflicting_grid_id": other_plant.grid_interconnection_id,
+                                },
+                            )
+                        )
+                        break
+
         # If no flags triggered, add a positive factor
         if not factors:
             factors.append(
@@ -283,7 +444,7 @@ class RuleEngine:
                     category="RULE_PASS",
                     severity="LOW",
                     score_contribution=0.0,
-                    description="All deterministic physical, meter, duplicate, and documentation rules passed cleanly.",
+                    description="All deterministic physical, meter, duplicate, weather, and documentation rules passed cleanly.",
                     flagged=False,
                 )
             )

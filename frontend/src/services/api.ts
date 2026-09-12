@@ -366,5 +366,71 @@ export class ApiService {
   static async getFabricFraudAlerts(): Promise<any[]> {
     return this.request<any[]>("/fraud/alerts");
   }
+
+  // Hackathon Live Tamper Attack Simulation
+  static async simulateLedgerTamper(): Promise<{
+    status: string;
+    tampered_block_index: number;
+    attack_vector: string;
+    original_claimed_mwh: number;
+    malicious_claimed_mwh: number;
+    message: string;
+  }> {
+    return this.request("/ledger/simulate-tamper", {
+      method: "POST",
+    });
+  }
+
+  static async restoreLedgerTamper(): Promise<{
+    status: string;
+    is_valid: boolean;
+    total_blocks: number;
+    verification_message: string;
+  }> {
+    return this.request("/ledger/restore-tamper", {
+      method: "POST",
+    });
+  }
+
+  // Data Protection & Zero-Knowledge Cryptographic Privacy
+  static async generatePedersenCommitment(value: number): Promise<any> {
+    return this.request("/privacy/pedersen-commit", {
+      method: "POST",
+      body: JSON.stringify({ value }),
+    });
+  }
+
+  static async verifyPedersenCommitment(payload: {
+    commitment_hex: string;
+    value: number;
+    blinding_factor_hex: string;
+  }): Promise<any> {
+    return this.request("/privacy/verify-pedersen", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async generateNIZKBoundsProof(payload: {
+    claimed_mwh: number;
+    metered_mwh: number;
+    tolerance_percentage?: number;
+  }): Promise<any> {
+    return this.request("/privacy/nizk-bounds-proof", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async verifySmartMeterDID(payload: {
+    meter_did: string;
+    payload: any;
+    signature_hex: string;
+  }): Promise<any> {
+    return this.request("/privacy/verify-meter-did", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
 }
 

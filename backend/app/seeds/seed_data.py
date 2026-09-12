@@ -512,6 +512,132 @@ def seed_database(force_reseed: bool = False):
                 },
             )
 
+        # -------------------------------------------------------------
+        # Scenario 5: Weather Oracle Anomaly ("Phantom Solar Claim" under Heavy Overcast)
+        # -------------------------------------------------------------
+        monsoon_start = datetime(2026, 7, 10, 0, 0, 0, tzinfo=timezone.utc)
+        monsoon_end = datetime(2026, 7, 10, 23, 59, 59, tzinfo=timezone.utc)
+        risk_wth = RiskFusionEngine.evaluate_claim(
+            db=db,
+            plant=plant_solar,
+            period_start=monsoon_start,
+            period_end=monsoon_end,
+            claimed_mwh=950.0,  # Exceeds maximum feasible under monsoon cloud cover (~248 MWh)
+            submitted_by_user_id=gen_solar.id,
+        )
+        fp_wth = compute_submission_fingerprint(plant_solar.id, monsoon_start, monsoon_end, 950.0)
+        claim_wth = CertificateClaim(
+            claim_uid="CLM-2026-FRAUD-WTH",
+            plant_id=plant_solar.id,
+            submitted_by_user_id=gen_solar.id,
+            period_start=monsoon_start,
+            period_end=monsoon_end,
+            claimed_mwh=950.0,
+            submission_fingerprint=fp_wth,
+            status=ClaimStatus.HELD,
+            risk_score=risk_wth.final_risk_score,
+            risk_level=risk_wth.risk_level,
+            risk_breakdown=risk_wth.model_dump(),
+        )
+        db.add(claim_wth)
+        db.flush()
+
+        case_wth = InvestigationCase(
+            case_number="CASE-2026-WTH-001",
+            claim_id=claim_wth.id,
+            assigned_investigator_id=regulator_user.id,
+            status=CaseStatus.OPEN,
+            priority=RiskLevel.HIGH,
+            decision_action=DecisionAction.CONFIRM_FRAUD_HOLD,
+            findings="RULE-011 triggered: Claimed 950.0 MWh exceeds meteorological solar irradiance limit under monsoon cloud cover (Copernicus CAMS & NASA POWER Reanalysis).",
+            notes="Ground-truth satellite reanalysis indicates heavy monsoon cloud cover (35% standard insolation). Claimed energy is meteorologically impossible.",
+        )
+        db.add(case_wth)
+
+        # -------------------------------------------------------------
+        # Scenario 6: Overlapping Generation Interval ("Time-Slice Double Counting")
+        # -------------------------------------------------------------
+        overlap_start = last_month_start + timedelta(days=10)
+        overlap_end = last_month_start + timedelta(days=25)
+        risk_ovl = RiskFusionEngine.evaluate_claim(
+            db=db,
+            plant=plant_solar,
+            period_start=overlap_start,
+            period_end=overlap_end,
+            claimed_mwh=3200.0,
+            submitted_by_user_id=gen_solar.id,
+        )
+        fp_ovl = compute_submission_fingerprint(plant_solar.id, overlap_start, overlap_end, 3200.0)
+        claim_ovl = CertificateClaim(
+            claim_uid="CLM-2026-FRAUD-OVL",
+            plant_id=plant_solar.id,
+            submitted_by_user_id=gen_solar.id,
+            period_start=overlap_start,
+            period_end=overlap_end,
+            claimed_mwh=3200.0,
+            submission_fingerprint=fp_ovl,
+            status=ClaimStatus.HELD,
+            risk_score=risk_ovl.final_risk_score,
+            risk_level=risk_ovl.risk_level,
+            risk_breakdown=risk_ovl.model_dump(),
+        )
+        db.add(claim_ovl)
+        db.flush()
+
+        case_ovl = InvestigationCase(
+            case_number="CASE-2026-OVL-001",
+            claim_id=claim_ovl.id,
+            assigned_investigator_id=regulator_user.id,
+            status=CaseStatus.OPEN,
+            priority=RiskLevel.CRITICAL,
+            decision_action=DecisionAction.CONFIRM_FRAUD_HOLD,
+            findings=f"RULE-012 triggered: Generation interval overlaps previously submitted and approved claim {claim_1.claim_uid} by 360.0 hours.",
+            notes="Time-slice slicing detected. The generator attempted to double-claim the middle 15 days of the previous vintage month.",
+        )
+        db.add(case_ovl)
+
+        # -------------------------------------------------------------
+        # Scenario 7: Nocturnal Solar Generation Violation
+        # -------------------------------------------------------------
+        night_start = datetime(2026, 8, 15, 22, 0, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 8, 16, 4, 0, 0, tzinfo=timezone.utc)
+        risk_noc = RiskFusionEngine.evaluate_claim(
+            db=db,
+            plant=plant_solar,
+            period_start=night_start,
+            period_end=night_end,
+            claimed_mwh=210.0,
+            submitted_by_user_id=gen_solar.id,
+        )
+        fp_noc = compute_submission_fingerprint(plant_solar.id, night_start, night_end, 210.0)
+        claim_noc = CertificateClaim(
+            claim_uid="CLM-2026-FRAUD-NOC",
+            plant_id=plant_solar.id,
+            submitted_by_user_id=gen_solar.id,
+            period_start=night_start,
+            period_end=night_end,
+            claimed_mwh=210.0,
+            submission_fingerprint=fp_noc,
+            status=ClaimStatus.HELD,
+            risk_score=risk_noc.final_risk_score,
+            risk_level=risk_noc.risk_level,
+            risk_breakdown=risk_noc.model_dump(),
+        )
+        db.add(claim_noc)
+        db.flush()
+
+        case_noc = InvestigationCase(
+            case_number="CASE-2026-NOC-001",
+            claim_id=claim_noc.id,
+            assigned_investigator_id=regulator_user.id,
+            status=CaseStatus.OPEN,
+            priority=RiskLevel.CRITICAL,
+            decision_action=DecisionAction.CONFIRM_FRAUD_HOLD,
+            findings="RULE-013 triggered: Claimed 210.0 MWh solar generation strictly between 22:00 and 04:00 (nighttime).",
+            notes="Physical impossibility. Solar photovoltaic panels produce zero electricity at night. Clear sign of falsified synthetic meter logs.",
+        )
+        db.add(case_noc)
+
         db.commit()
         print("--> Database successfully seeded with full forensic fraud scenarios!")
 

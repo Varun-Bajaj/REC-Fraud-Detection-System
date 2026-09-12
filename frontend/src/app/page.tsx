@@ -69,6 +69,9 @@ const DEMO_PERSONAS = {
 const DEMO_LINEAGE_QUERIES = [
   { label: "Meter Overclaim (+216%)", query: "CLM-2026-FRAUD-MTR", badge: "FRAUD" },
   { label: "Capacity Impossibility (>240%)", query: "CLM-2026-FRAUD-CAP", badge: "FRAUD" },
+  { label: "Weather Oracle (Phantom Solar)", query: "CLM-2026-FRAUD-WTH", badge: "FRAUD" },
+  { label: "Time-Slice Slicing (Overlap)", query: "CLM-2026-FRAUD-OVL", badge: "FRAUD" },
+  { label: "Nocturnal Solar Claim (02:00 AM)", query: "CLM-2026-FRAUD-NOC", badge: "FRAUD" },
   { label: "Circular Wash Trading Loop", query: "REC-2026-WND-88319", badge: "LOOP" },
   { label: "Verified Active Solar REC", query: "REC-2026-SOL-09921", badge: "VERIFIED" },
   { label: "Clean Generation Baseline", query: "CLM-2026-LEGIT-01", badge: "CLEAN" },
@@ -140,6 +143,77 @@ export default function Home() {
   const [newClaimStart, setNewClaimStart] = useState("2026-03-01T00:00:00");
   const [newClaimEnd, setNewClaimEnd] = useState("2026-03-31T23:59:59");
   const [newClaimMeterId, setNewClaimMeterId] = useState<number>(1);
+
+  // Hackathon Tamper Simulator & ZK Privacy State
+  const [tamperLoading, setTamperLoading] = useState(false);
+  const [tamperStatus, setTamperStatus] = useState<any>(null);
+  const [zkClaimMwh, setZkClaimMwh] = useState<number>(1000);
+  const [zkMeterMwh, setZkMeterMwh] = useState<number>(1015);
+  const [zkTolerance, setZkTolerance] = useState<number>(2.0);
+  const [zkProofResult, setZkProofResult] = useState<any>(null);
+  const [zkLoading, setZkLoading] = useState(false);
+
+  const handleSimulateTamper = async () => {
+    setTamperLoading(true);
+    try {
+      const res = await ApiService.simulateLedgerTamper();
+      setTamperStatus(res);
+      const audit = await ApiService.verifyLedgerIntegrity();
+      setLedgerAudit(audit);
+      const blocks = await ApiService.getLedgerBlocks(20);
+      setLedgerBlocks(blocks);
+    } catch (err: any) {
+      alert("Tamper simulation failed: " + err.message);
+    } finally {
+      setTamperLoading(false);
+    }
+  };
+
+  const handleRestoreTamper = async () => {
+    setTamperLoading(true);
+    try {
+      await ApiService.restoreLedgerTamper();
+      setTamperStatus(null);
+      const audit = await ApiService.verifyLedgerIntegrity();
+      setLedgerAudit(audit);
+      const blocks = await ApiService.getLedgerBlocks(20);
+      setLedgerBlocks(blocks);
+    } catch (err: any) {
+      alert("Restore failed: " + err.message);
+    } finally {
+      setTamperLoading(false);
+    }
+  };
+
+  const handleRefreshLedgerAudit = async () => {
+    setTamperLoading(true);
+    try {
+      const audit = await ApiService.verifyLedgerIntegrity();
+      setLedgerAudit(audit);
+      const blocks = await ApiService.getLedgerBlocks(20);
+      setLedgerBlocks(blocks);
+    } catch (err: any) {
+      alert("Verification failed: " + err.message);
+    } finally {
+      setTamperLoading(false);
+    }
+  };
+
+  const handleGenerateZkProof = async () => {
+    setZkLoading(true);
+    try {
+      const res = await ApiService.generateNIZKBoundsProof({
+        claimed_mwh: zkClaimMwh,
+        metered_mwh: zkMeterMwh,
+        tolerance_percentage: zkTolerance,
+      });
+      setZkProofResult(res);
+    } catch (err: any) {
+      alert("ZK proof generation failed: " + err.message);
+    } finally {
+      setZkLoading(false);
+    }
+  };
 
   // Check existing token on mount
   useEffect(() => {
@@ -1328,6 +1402,176 @@ export default function Home() {
             {/* TAB: REGULATOR - LEDGER AUDIT */}
             {isRegulator && activeTab === "ledger" && (
               <div className="space-y-6">
+                {/* HACKATHON LIVE ATTACK & TAMPER PROOF DEMONSTRATOR */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-5">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-bold text-white flex items-center gap-2">
+                          <Zap className="w-5 h-5 text-amber-400" />
+                          <span>Live Hackathon Tamper Attack Simulator</span>
+                        </h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                          Grand Prix Live Demo
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Demonstrates why a centralized relational database (PostgreSQL/SQLite) is vulnerable to rogue administrators or SQL injection, and how our SHA-256 Ledger instantly detects and isolates retroactive tampering.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${
+                        ledgerAudit?.is_valid
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          : "bg-rose-500/20 text-rose-400 border-rose-500/50 animate-pulse"
+                      }`}>
+                        {ledgerAudit?.is_valid ? "✓ SHA-256 CHAIN 100% VALID" : "✗ TAMPER DETECTED"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Interactive Attack Controls */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleSimulateTamper}
+                      disabled={tamperLoading}
+                      className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-rose-950/50"
+                    >
+                      {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                      <span>Simulate Rogue DB Tamper (+5000 MWh Row Update)</span>
+                    </button>
+
+                    <button
+                      onClick={handleRefreshLedgerAudit}
+                      disabled={tamperLoading}
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow"
+                    >
+                      {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      <span>Run Cryptographic Audit Traversal</span>
+                    </button>
+
+                    <button
+                      onClick={handleRestoreTamper}
+                      disabled={tamperLoading}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow"
+                    >
+                      {tamperLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                      <span>Self-Heal & Restore Ledger Parity</span>
+                    </button>
+                  </div>
+
+                  {/* Tamper Alert Banner */}
+                  {!ledgerAudit?.is_valid && (
+                    <div className="p-4 bg-rose-950/40 border border-rose-600 rounded-xl space-y-2">
+                      <div className="flex items-center gap-2 text-rose-300 font-bold text-xs">
+                        <ShieldAlert className="w-4 h-4 text-rose-400" />
+                        <span>CRYPTOGRAPHIC INTEGRITY VIOLATION DETECTED</span>
+                      </div>
+                      <p className="text-xs text-rose-200">
+                        {ledgerAudit?.verification_message}
+                      </p>
+                      <div className="text-[11px] font-mono text-rose-300/80 pt-1">
+                        Off-chain database was altered out-of-consensus. Consensus peers reject this block and all downstream certificate mints until restored.
+                      </div>
+                    </div>
+                  )}
+
+                  {ledgerAudit?.is_valid && (
+                    <div className="p-3.5 bg-emerald-950/30 border border-emerald-800 rounded-xl flex items-center justify-between text-xs text-emerald-300">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>{ledgerAudit.verification_message}</span>
+                      </div>
+                      <span className="font-mono text-[11px] text-emerald-400/80">Traversed from Genesis to Head</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* ZERO-KNOWLEDGE PRIVACY & CONFIDENTIAL CLAIM VERIFIER */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-800 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-5 h-5 text-indigo-400" />
+                        <h3 className="text-base font-bold text-white">Zero-Knowledge Data Protection & Privacy Verifier</h3>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+                          RFC-3526 Pedersen MODP-2048
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Allows enterprise buyers and generators to prove generation compliance without disclosing proprietary factory load curves or confidential PPA contract pricing.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <label className="block text-slate-300 mb-1">Claimed Clean Energy (MWh)</label>
+                      <input
+                        type="number"
+                        value={zkClaimMwh}
+                        onChange={(e) => setZkClaimMwh(Number(e.target.value))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 mb-1">Confidential Smart Meter Reading (MWh)</label>
+                      <input
+                        type="number"
+                        value={zkMeterMwh}
+                        onChange={(e) => setZkMeterMwh(Number(e.target.value))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 mb-1">Allowed Tolerance (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={zkTolerance}
+                        onChange={(e) => setZkTolerance(Number(e.target.value))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleGenerateZkProof}
+                      disabled={zkLoading}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow"
+                    >
+                      {zkLoading ? <RotateCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      <span>Generate Non-Interactive Zero-Knowledge (NIZK) Proof</span>
+                    </button>
+                  </div>
+
+                  {zkProofResult && (
+                    <div className="p-4 bg-slate-950 border border-indigo-900/60 rounded-xl space-y-2 font-mono text-[11px]">
+                      <div className="flex items-center justify-between text-indigo-400 font-bold">
+                        <span>ZK Range Proof Protocol: {zkProofResult.proof_protocol}</span>
+                        <span className={`px-2 py-0.5 rounded ${zkProofResult.is_valid_proof ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
+                          {zkProofResult.is_valid_proof ? "✓ PROOF VALIDATED" : "✗ PROOF REJECTED"}
+                        </span>
+                      </div>
+                      <div className="text-slate-400 break-all">
+                        <span className="text-slate-300 font-semibold">Claim Commitment (C_claim):</span> {zkProofResult.claim_commitment}
+                      </div>
+                      <div className="text-slate-400 break-all">
+                        <span className="text-slate-300 font-semibold">Meter Commitment (C_meter):</span> {zkProofResult.meter_commitment}
+                      </div>
+                      <div className="text-slate-400 break-all">
+                        <span className="text-slate-300 font-semibold">Fiat-Shamir Challenge (e):</span> {zkProofResult.fiat_shamir_challenge}
+                      </div>
+                      <div className="text-emerald-400 pt-1 font-sans text-xs">
+                        🛡️ {zkProofResult.confidentiality_guarantee}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* CHRONOLOGICAL BLOCK EXPLORER */}
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
                   <div className="flex justify-between items-center mb-4">
                     <div>
@@ -1339,13 +1583,7 @@ export default function Home() {
                         Zero-tampering hash-linked chain securing claim submissions, mints, and transfers
                       </p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono border ${
-                      ledgerAudit?.is_valid
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                        : "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                    }`}>
-                      {ledgerAudit?.is_valid ? "✓ SHA-256 CHAIN 100% VALID" : "✗ TAMPER DETECTED"}
-                    </span>
+                    <span className="text-xs font-mono text-slate-400">{ledgerBlocks.length} Blocks Recorded</span>
                   </div>
 
                   <div className="space-y-2.5">
