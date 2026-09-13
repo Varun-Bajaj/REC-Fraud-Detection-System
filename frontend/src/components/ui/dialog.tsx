@@ -15,7 +15,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-forest-950/40 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-slate-900/40 dark:bg-forest-950/60 backdrop-blur-sm transition-opacity"
         onClick={() => onOpenChange(false)}
       />
       {/* Content wrapper */}
@@ -31,7 +31,7 @@ const DialogContent = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "relative w-full rounded-2xl border border-sage-200 bg-white p-6 shadow-2xl transition-all duration-200 animate-in fade-in-90 zoom-in-95 max-h-[90vh] overflow-y-auto",
+      "relative w-full rounded-2xl border border-slate-200 dark:border-outline-variant/30 bg-white dark:bg-surface-container p-6 text-slate-900 dark:text-slate-100 shadow-2xl transition-all duration-200 animate-in fade-in-90 zoom-in-95 max-h-[90vh] overflow-y-auto backdrop-blur-xl",
       className
     )}
     {...props}
@@ -40,7 +40,7 @@ const DialogContent = React.forwardRef<
     {onClose && (
       <button
         onClick={onClose}
-        className="absolute right-4 top-4 rounded-full p-1 text-sage-600 hover:bg-sage-100 hover:text-forest-900 transition-colors"
+        className="absolute right-4 top-4 rounded-full p-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-surface-container-highest hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
       >
         <X className="h-5 w-5" />
         <span className="sr-only">Close</span>
@@ -59,7 +59,7 @@ const DialogTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HT
   ({ className, ...props }, ref) => (
     <h2
       ref={ref}
-      className={cn("text-xl font-bold leading-none tracking-tight text-forest-900", className)}
+      className={cn("text-xl font-bold font-headline leading-none tracking-tight text-slate-900 dark:text-slate-100", className)}
       {...props}
     />
   )
@@ -70,13 +70,13 @@ const DialogDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn("text-sm text-sage-600 mt-1", className)} {...props} />
+  <p ref={ref} className={cn("text-xs text-slate-500 dark:text-slate-400 mt-1", className)} {...props} />
 ));
 DialogDescription.displayName = "DialogDescription";
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2 mt-6 pt-4 border-t border-sage-100", className)}
+    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2 mt-6 pt-4 border-t border-slate-200 dark:border-outline-variant/20", className)}
     {...props}
   />
 );

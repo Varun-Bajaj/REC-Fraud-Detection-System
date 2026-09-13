@@ -10,7 +10,11 @@ import {
   RiskBreakdown,
 } from "../types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8000/api/v1`
+    : "http://127.0.0.1:8000/api/v1");
 
 export class ApiService {
   private static token: string | null = null;
@@ -44,17 +48,25 @@ export class ApiService {
       headers["Content-Type"] = "application/json";
     }
 
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ detail: "Network request failed" }));
-      throw new Error(errorData.detail || `Request failed with status ${res.status}`);
+    try {
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ detail: "Network request failed" }));
+        throw new Error(errorData.detail || `Request failed with status ${res.status}`);
+      }
+
+      return res.json();
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    return res.json();
   }
 
   // Auth

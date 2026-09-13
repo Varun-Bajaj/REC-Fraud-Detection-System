@@ -8,22 +8,24 @@
 
 ## 📚 Technical Documentation Index
 
-For in-depth specifications, forensic guides, and API contracts, explore the documentation suite:
+> 📕 **Complete Technical Specification Manual**: [Download Master PDF (`docs/REC_Guardian_Complete_Technical_Specification.pdf`)](docs/REC_Guardian_Complete_Technical_Specification.pdf)  
+> 📑 **Official Submission Report**: [Download Project Report PDF (`docs/Renewable Energy Certificate (REC) Fraud Detection System.pdf`)](docs/Renewable%20Energy%20Certificate%20(REC)%20Fraud%20Detection%20System.pdf)  
+> 🧪 **Verification Evidence Suite**: Sample PDFs available in [`docs/sample_evidence/`](docs/sample_evidence/)
 
-| Document | Link | Summary |
+| Document | Markdown & PDF Links | Summary |
 | :--- | :--- | :--- |
-| ⚡ **Fabric Architecture** | [`docs/architecture.md`](docs/architecture.md) | Hyperledger Fabric v2.5 DLT architecture, 4-org topology, on-chain vs off-chain separation, rationale. |
-| 🌐 **Fabric Network Spec** | [`docs/fabric-network.md`](docs/fabric-network.md) | Detailed node topology, Raft consensus, MSP identity mapping, and deployment scripts. |
-| 📜 **Fabric Chaincode** | [`docs/chaincode.md`](docs/chaincode.md) | `RECContract` TypeScript implementation, MSP authorization checks, and lifecycle states. |
-| 📊 **REC Data Model** | [`docs/data-model.md`](docs/data-model.md) | On-chain asset schema, conservation laws, and off-chain PostgreSQL models. |
-| 🔐 **Security & Access Control** | [`docs/security.md`](docs/security.md) | MSP-level enforcement, off-chain SHA-256 document hashing, and threat modeling. |
-| 🔌 **Fabric REST API** | [`docs/api.md`](docs/api.md) | Endpoints for REC issuance, transfer, retirement, cancellation, verification, and audit history. |
-| 🚨 **Fraud Detection Engine** | [`docs/fraud-detection.md`](docs/fraud-detection.md) | Off-chain multi-engine forensic analysis, double-counting detection, and risk scoring. |
-| 🎬 **Official Demo Guide** | [`docs/demo.md`](docs/demo.md) | Interactive walkthrough for the 9-step demonstration scenario and prototype limitations. |
-| 🏛️ **System Architecture** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core 6-layer architecture, mathematical formulations, and risk fusion ensemble. |
-| 🔌 **Core REST API Reference**| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Platform OpenAPI/REST documentation across auth, facilities, claims, and telemetry. |
-| 🚨 **Fraud Scenarios Guide** | [`docs/FRAUD_SCENARIOS_GUIDE.md`](docs/FRAUD_SCENARIOS_GUIDE.md) | Forensic analysis and investigation walkthrough for the 5 seeded fraud scenarios. |
-| 🎨 **Frontend & UX Guide** | [`docs/FRONTEND_GUIDE.md`](docs/FRONTEND_GUIDE.md) | GovTech design system, Lineage Explorer, and Vis.js network surveillance. |
+| 🏛️ **System Architecture** | [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [**PDF**](docs/ARCHITECTURE.pdf) | Core 6-layer architecture, mathematical formulations, and risk fusion ensemble. |
+| 🌐 **Fabric Network Spec** | [`fabric-network.md`](docs/fabric-network.md) · [**PDF**](docs/fabric-network.pdf) | Detailed node topology, Raft consensus, MSP identity mapping, and deployment scripts. |
+| 📜 **Fabric Chaincode** | [`chaincode.md`](docs/chaincode.md) · [**PDF**](docs/chaincode.pdf) | `RECContract` TypeScript implementation, MSP authorization checks, and lifecycle states. |
+| 📊 **REC Data Model** | [`data-model.md`](docs/data-model.md) · [**PDF**](docs/data-model.pdf) | On-chain asset schema, conservation laws, and off-chain PostgreSQL models. |
+| 🔐 **Security & Access Control** | [`security.md`](docs/security.md) · [**PDF**](docs/security.pdf) | MSP-level enforcement, off-chain SHA-256 document hashing, and threat modeling. |
+| 🔌 **Fabric REST API** | [`api.md`](docs/api.md) · [**PDF**](docs/api.pdf) | Endpoints for REC issuance, transfer, retirement, cancellation, verification, and audit history. |
+| 🔌 **Core REST API Reference**| [`API_REFERENCE.md`](docs/API_REFERENCE.md) · [**PDF**](docs/API_REFERENCE.pdf) | Platform OpenAPI/REST documentation across auth, facilities, claims, and telemetry. |
+| 🚨 **Fraud Detection Engine** | [`fraud-detection.md`](docs/fraud-detection.md) · [**PDF**](docs/fraud-detection.pdf) | Off-chain multi-engine forensic analysis, double-counting detection, and risk scoring. |
+| 🚨 **Fraud Scenarios Guide** | [`FRAUD_SCENARIOS_GUIDE.md`](docs/FRAUD_SCENARIOS_GUIDE.md) · [**PDF**](docs/FRAUD_SCENARIOS_GUIDE.pdf) | Forensic analysis and investigation walkthrough for the 5 seeded fraud scenarios. |
+| 🎨 **Frontend & UX Guide** | [`FRONTEND_GUIDE.md`](docs/FRONTEND_GUIDE.md) · [**PDF**](docs/FRONTEND_GUIDE.pdf) | GovTech design system, Lineage Explorer, and Vis.js network surveillance. |
+| 📋 **Fabric Implementation** | [`fabric-implementation-plan.md`](docs/fabric-implementation-plan.md) · [**PDF**](docs/fabric-implementation-plan.pdf) | Architectural roadmap, milestones, and on-chain vs off-chain storage design. |
+| 🎬 **Official Demo Guide** | [`demo.md`](docs/demo.md) · [**PDF**](docs/demo.pdf) | Interactive walkthrough for the 9-step demonstration scenario and prototype limitations. |
 
 ---
 

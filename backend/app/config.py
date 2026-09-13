@@ -25,6 +25,8 @@ class Settings(BaseSettings):
 
     # Fabric DLT Gateway
     FABRIC_GATEWAY_URL: str = os.getenv("FABRIC_GATEWAY_URL", "http://localhost:5050")
+    FABRIC_SIMULATOR_FALLBACK: bool = os.getenv("FABRIC_SIMULATOR_FALLBACK", "true").lower() in ("true", "1", "yes")
+    FABRIC_SIMULATOR_MODE: bool = os.getenv("FABRIC_SIMULATOR_MODE", "false").lower() in ("true", "1", "yes")
 
     # Document Uploads
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
